@@ -14,6 +14,9 @@ Eine Lern-App für Grundschulkinder in Bayern: Sie übt die bestimmten Artikel, 
 - **Mehrzahl** – die richtige Pluralform auswählen
 - **Zeitrennen** – möglichst viele richtige Antworten in 60 Sekunden
 - **Fehlerwörter** – gezielt die Wörter üben, die noch schwerfallen
+- **Lückensätze** – den Artikel im Satz einsetzen (über 1 200 Sätze)
+- **Fehler finden** – stimmt der Artikel im Satz oder nicht?
+- **Geschichten** – 30 kurze Geschichten mit Lücken; Geschichten mit den eigenen Fehlerwörtern stehen oben
 - **Merkregeln** – Tipps wie -ung → die, -chen → das, zusammengesetzte Wörter; Ausnahmen werden markiert
 
 ## Wörter lernen (alle Wortarten)
