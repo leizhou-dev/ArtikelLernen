@@ -902,4 +902,11 @@ fetch('words.json').then(r => r.json()).then(ws => {
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { }));
+  // Neue Version: einmal automatisch neu laden, sobald der neue Service Worker übernimmt
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded || document.body.classList.contains('exercise')) return;
+    reloaded = true; location.reload();
+  });
 }
