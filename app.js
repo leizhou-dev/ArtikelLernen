@@ -52,7 +52,7 @@ function grade(kind, w, ok, mode) {
   if (ok) addStars(1);
   save();
 }
-function addStars(n) { P().stars += n; $('#starCount').textContent = P().stars; }
+function addStars(n) { P().stars += n; }
 function logRound(mode, ok, total) {
   P().rounds.push({ t: Date.now(), m: mode, ok, n: total });
   if (P().rounds.length > 500) P().rounds.shift();
@@ -120,12 +120,17 @@ function beep(ok) {
 }
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2200); }
 
-/* ---------- Bausteine ---------- */
+
+/* ---------- Bausteine (ipados27-ui) ---------- */
 const isPhoto = w => /^https?:/.test(w.bild || '');
-function imgHTML(w) {
-  if (!w.bild) return '<div class="qimg noimg"></div>';
-  const cap = isPhoto(w) ? `<div class="credits small">Foto: ${esc(w.bildQuelle.autor)} · ${esc(w.bildQuelle.lizenz)}</div>` : '';
-  return `<div class="qimg ${isPhoto(w) ? 'photo' : ''}"><img src="${esc(w.bild)}" alt="" draggable="false" onerror="this.parentNode.classList.add('noimg');this.remove()"></div>${cap}`;
+function picHTML(w) {
+  if (!w.bild) return '';
+  const cap = isPhoto(w) ? `<div class="credit">Foto: ${esc(w.bildQuelle.autor)} · ${esc(w.bildQuelle.lizenz)}</div>` : '';
+  return `<div class="pic ${isPhoto(w) ? 'photo' : ''}"><img src="${esc(w.bild)}" alt="" draggable="false" onerror="this.parentNode.remove()"></div>${cap}`;
+}
+function thumbHTML(w) {
+  if (!w.bild) return `<span class="thumb empty">Aa</span>`;
+  return `<span class="thumb ${isPhoto(w) ? 'photo' : ''}"><img src="${esc(w.bild)}" alt="" loading="lazy" draggable="false" onerror="this.parentNode.className='thumb empty';this.parentNode.textContent='Aa'"></span>`;
 }
 function artWord(w) { return w.artikel ? `<span class="art c-${w.artikel}">${w.artikel}</span>${esc(w.wort)}` : esc(w.wort); }
 function fullText(w) { return w.artikel ? `${w.artikel} ${w.wort}` : w.wort; }
@@ -138,41 +143,61 @@ function gapSentence(w) {
 }
 function ruleHTML(w) {
   let h = '';
-  if (w.regel) {
-    h += w.ausnahme
-      ? `<div class="rule">💡 <b>Regel:</b> ${esc(w.regel)}<br>⚠️ Aber <b>${esc(fullText(w))}</b> ist eine Ausnahme – gut merken!</div>`
-      : `<div class="rule">💡 <b>Tipp:</b> ${esc(w.regel)}</div>`;
-  }
-  if (w.hinweis) h += `<div class="rule">ℹ️ ${esc(w.hinweis)}</div>`;
+  if (w.regel) h += w.ausnahme
+    ? `<div class="fb-rule">💡 <b>Regel:</b> ${esc(w.regel)}<br>⚠️ Aber <b>${esc(fullText(w))}</b> ist eine Ausnahme – gut merken!</div>`
+    : `<div class="fb-rule">💡 <b>Tipp:</b> ${esc(w.regel)}</div>`;
+  if (w.hinweis) h += `<div class="fb-rule">ℹ️ ${esc(w.hinweis)}</div>`;
   return h;
 }
-function progressBar(i, n) { return `<div class="progress"><i style="width:${Math.round(i / n * 100)}%"></i></div>`; }
-function setTitle(t) { $('#title').textContent = t; document.title = t + ' – Artikel lernen'; }
+function pageHeader(title, sub = '', trailing = '') {
+  return `<div class="scroll-edge"><div class="se-side"></div><div class="se-title">${title}</div><div class="se-side end">${trailing}</div></div>
+    <header class="large-header"><div class="lh-row"><div><h1 class="large-title">${title}</h1>${sub ? `<div class="lh-sub">${sub}</div>` : ''}</div>${trailing ? `<div class="lh-trailing">${trailing}</div>` : ''}</div></header>`;
+}
+function navBar(center = '', trailing = '', back = false) {
+  return `<div class="navbar"><div class="nb-side"><button class="glass-btn" data-close aria-label="${back ? 'Zurück' : 'Beenden'}">${ico(back ? 'chevronLeft' : 'xmark', 20, 2.2)}</button></div>
+    <div class="nb-center">${center}</div><div class="nb-side end">${trailing}</div></div>`;
+}
+function progressNav(i, n) {
+  return navBar(`<div class="progress-track"><div class="progress-fill" style="width:${Math.round(i / n * 100)}%"></div></div>`, `<span class="counter">${Math.min(i + 1, n)}/${n}</span>`);
+}
+function group(header, rows, footer = '') {
+  return `<section class="group">${header ? `<h2 class="group-header">${header}</h2>` : ''}<div class="group-body">${rows}</div>${footer ? `<p class="group-footer">${footer}</p>` : ''}</section>`;
+}
+function row({ icon = '', title = '', sub = '', detail, chev = false, attrs = '', cls = '' }) {
+  const tag = attrs ? 'button' : 'div';
+  return `<${tag} class="row${attrs ? ' tappable' : ''}${cls ? ' ' + cls : ''}" ${attrs}>${icon ? `<span class="row-icon">${icon}</span>` : ''}
+    <span class="row-main">${title ? `<span class="row-title">${title}</span>` : ''}${sub ? `<span class="row-sub">${sub}</span>` : ''}</span>
+    ${detail !== undefined ? `<span class="row-detail">${detail}</span>` : ''}${chev ? ico('chevronRight', 16, 2.4, 'row-chev') : ''}</${tag}>`;
+}
+function toggle(name, on) {
+  return `<label class="toggle"><input type="checkbox" role="switch" data-toggle="${name}" ${on ? 'checked' : ''}><span class="toggle-track"><span class="toggle-thumb"></span></span></label>`;
+}
+function tileBtn(route, icon, color, title, desc, badge) {
+  return `<button class="tile-btn" data-go="${route}"><span class="tile-top">${iconTile(icon, color, 40)}${badge ? `<span class="badge">${badge}</span>` : ''}</span>
+    <span class="tile-title">${title}</span><span class="tile-desc">${desc}</span></button>`;
+}
+function setTitle(t) { document.title = t + ' – Artikel lernen'; }
 function go(h) { if (location.hash === '#' + h) render(); else location.hash = h; }
+let lastTab = 'home';
+const closeTarget = () => lastTab;
 
 /* ---------- Ergebnis ---------- */
 function resultView(mode, ok, total, wrong, again) {
   logRound(mode, ok, total);
-  const perfect = total > 0 && ok === total;
-  if (perfect) addStars(3);
+  if (total > 0 && ok === total) addStars(3);
   save();
   const pct = total ? ok / total : 0;
   const face = pct === 1 ? '🏆' : pct >= .8 ? '🌟' : pct >= .5 ? '👍' : '💪';
   const msg = pct === 1 ? 'Alles richtig! +3 Bonussterne' : pct >= .8 ? 'Super gemacht!' : pct >= .5 ? 'Gut! Weiter so.' : 'Übung macht den Meister!';
-  view.innerHTML = `<div class="qcard result">
-    <div class="big">${face}</div><div class="score">${ok} von ${total}</div><p>${msg}</p>
-    ${wrong.length ? `<h3>Diese Wörter üben wir noch:</h3><div class="list">${wrong.map(w => `<button class="li" data-say="${esc(fullText(w))}">${w.bild ? `<img src="${esc(w.bild)}" alt="" onerror="this.outerHTML='<span class=ph>Aa</span>'">` : '<span class="ph">Aa</span>'}<span><b>${artWord(w)}</b>${w.plural ? `<small>Mehrzahl: ${esc(w.plural)}</small>` : ''}</span></button>`).join('')}</div>` : ''}
-    <div class="row" style="justify-content:center;margin-top:18px">
-      <button class="btn" id="again">🔁 Nochmal</button>
-      <button class="btn ghost" onclick="go('home')">🏠 Start</button>
-    </div></div>`;
+  view.innerHTML = `${navBar(MODE[mode] || '')}
+    <div class="result"><div class="big-emoji">${face}</div><div class="score">${ok} von ${total}</div><h2>${msg}</h2>
+    ${wrong.length ? group('Diese Wörter üben wir noch', wrong.map(w => row({ icon: thumbHTML(w), title: artWord(w), sub: w.plural ? 'Mehrzahl: die ' + esc(w.plural) : (w.formen ? esc(w.formen) : ''), detail: ico('speaker', 20, 2), attrs: `data-say="${esc(fullText(w))}"` })).join('')) : ''}
+    <div class="two"><button class="primary" id="again">${ico('repeat', 20, 2.2)} Nochmal</button><button class="secondary" data-close>Fertig</button></div></div>`;
   $('#again').onclick = again;
-  $$('[data-say]').forEach(b => b.onclick = () => say(b.dataset.say));
 }
 function emptyView(text) {
-  view.innerHTML = `<div class="qcard result"><div class="big">🙂</div><p>${text}</p>
-    <div class="row" style="justify-content:center"><button class="btn ghost" onclick="go('einstellungen')">⚙️ Auswahl ändern</button>
-    <button class="btn" onclick="go('home')">🏠 Start</button></div></div>`;
+  view.innerHTML = `${navBar()}<div class="result"><div class="big-emoji">🙂</div><h2>${text}</h2>
+    <div class="two"><button class="secondary" data-go="einstellungen">Auswahl ändern</button><button class="primary" data-close>Fertig</button></div></div>`;
 }
 
 /* ---------- Artikel-Quiz (auch Karteikasten & Fehlerwörter) ---------- */
@@ -183,44 +208,45 @@ function artikelRound(items, mode, again) {
     if (i >= items.length) return resultView(mode, ok, items.length, wrong, again);
     const w = items[i];
     const r = rec('art', w.id);
-    view.innerHTML = `${progressBar(i, items.length)}
-      <div class="qcard">
-        <button class="speak" aria-label="Vorlesen">🔊</button>
-        ${imgHTML(w)}
-        <div class="qword">${esc(w.wort)}</div>
-        <div class="qsub">${mode === 'kasten' ? `Fach ${r ? r.b : 'neu'}` : esc(w.thema)}</div>
-        <div class="answers">${ARTS.map(a => `<button class="ans ${a}" data-a="${a}">${a}</button>`).join('')}</div>
-        <div class="feedback"></div>
+    view.innerHTML = `${progressNav(i, items.length)}
+      <div class="stack">
+        <div class="question">
+          <button class="icon-btn q-speak" id="spk" aria-label="Vorlesen">${ico('speaker', 20, 2)}</button>
+          <div class="q-meta"><span class="chip">${mode === 'kasten' ? (r ? 'Fach ' + r.b : 'Neu') : esc(w.thema)}</span>${r && r.err && mode !== 'kasten' ? '<span class="chip warn">Wiederholung</span>' : ''}</div>
+          ${picHTML(w)}
+          <div class="q-main" id="qw">${esc(w.wort)}</div>
+          <div class="q-sub">Welcher Artikel passt?</div>
+        </div>
+        <div class="art-grid">${ARTS.map(a => `<button class="art-btn ${a}" data-a="${a}">${a}</button>`).join('')}</div>
+        <div id="fb"></div>
       </div>`;
-    $('.speak').onclick = () => say(w.wort);
-    $$('.ans').forEach(b => b.onclick = () => answer(b.dataset.a));
+    $('#spk').onclick = () => say(w.wort);
     let done = false;
-    function answer(a) {
+    $$('.art-btn').forEach(b => b.onclick = () => {
       if (done) return; done = true;
-      const right = a === w.artikel;
-      grade('art', w, right, mode);
-      beep(right);
-      $$('.ans').forEach(b => { b.classList.toggle('dim', b.dataset.a !== w.artikel); b.classList.toggle('right', b.dataset.a === w.artikel); });
-      $('.qword').innerHTML = artWord(w);
+      const right = b.dataset.a === w.artikel;
+      grade('art', w, right, mode); beep(right);
+      $$('.art-btn').forEach(x => { x.classList.toggle('dim', x.dataset.a !== w.artikel); x.classList.toggle('right', x.dataset.a === w.artikel); });
+      $('#qw').innerHTML = artWord(w);
       say(fullText(w));
-      const fb = $('.feedback');
-      const pl = w.plural ? `<div class="small muted">Mehrzahl: ${esc(w.plural)}</div>` : '';
+      const pl = w.plural ? `<div class="fb-ex">Mehrzahl: die ${esc(w.plural)}</div>` : '';
+      const fb = $('#fb');
       if (right) {
         ok++;
-        fb.className = 'feedback show ok';
-        fb.innerHTML = `✅ <b>Richtig!</b> ${artWord(w)} ${pl}${w.ausnahme || w.hinweis ? ruleHTML(w) : ''}`;
-        if (w.ausnahme || w.hinweis) fb.insertAdjacentHTML('beforeend', '<button class="btn next">Weiter ➜</button>');
-        else { later(() => { i++; show(); }, 1100); return; }
+        const extra = w.ausnahme || w.hinweis;
+        fb.innerHTML = `<div class="feedback ok"><div class="fb-title">${ico('checkCircle', 24, 2)} Richtig!</div><div class="fb-line">${artWord(w)}</div>${pl}${extra ? ruleHTML(w) : ''}
+          ${extra ? `<div class="fb-actions"><button class="primary big" id="next">Weiter</button></div>` : ''}</div>`;
+        if (!extra) { later(() => { i++; show(); }, 1100); return; }
       } else {
         wrong.push(w);
-        fb.className = 'feedback show bad';
-        fb.innerHTML = `❌ Leider falsch. Es heißt: <b>${artWord(w)}</b> ${pl}${ruleHTML(w)}
-          <div class="small muted" style="margin-top:6px">${esc(w.beispiel || '')}</div>
-          <button class="btn next">Weiter ➜</button>`;
-        $('.qcard').classList.add('shake');
+        fb.innerHTML = `<div class="feedback no"><div class="fb-title">${ico('xmark', 24, 2.2)} Leider falsch</div>
+          <div class="fb-line">Es heißt: <b>${artWord(w)}</b></div>${pl}${ruleHTML(w)}<div class="fb-ex">${esc(w.beispiel || '')}</div>
+          <div class="fb-actions"><button class="primary big" id="next">Weiter</button></div></div>`;
+        $('.question').classList.add('shake');
       }
-      $('.next').onclick = () => { i++; show(); };
-    }
+      $('#next').onclick = () => { i++; show(); };
+      $('#next').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
   };
   show();
 }
@@ -232,12 +258,11 @@ function kastenStart() {
   pool.forEach(w => { const r = rec('art', w.id); if (r) counts[r.b - 1]++; });
   const neu = pool.filter(w => !rec('art', w.id)).length;
   const due = dueCount(pool, 'art');
-  view.innerHTML = `<div class="qcard">
-    <h2>🗃️ Dein Karteikasten</h2>
-    <p class="muted">Richtig beantwortet ➜ das Wort rutscht ein Fach weiter und kommt später wieder.<br>Falsch ➜ zurück in Fach 1.</p>
-    <div class="boxes">${counts.map((c, k) => `<div>Fach ${k + 1}<b>${c}</b><span class="small muted">${['sofort', '1 Tag', '3 Tage', '7 Tage', '21 Tage'][k]}</span></div>`).join('')}</div>
-    <p><b>${due}</b> Wörter sind heute dran · <b>${neu}</b> neue Wörter</p>
-    <button class="btn" id="los" style="width:100%">Los geht's! 🚀</button></div>`;
+  view.innerHTML = `${navBar('Karteikasten')}
+    ${pageHeader('Karteikasten', 'Richtig ➜ ein Fach weiter. Falsch ➜ zurück in Fach 1.')}
+    <div class="boxes">${counts.map((c, k) => `<div class="stat"><span class="stat-n">${c}</span>Fach ${k + 1}<span class="small">${['sofort', '1 Tag', '3 Tage', '7 Tage', '21 Tage'][k]}</span></div>`).join('')}</div>
+    ${group('', row({ icon: iconTile('repeat', 'var(--orange)', 30), title: 'Heute fällig', detail: due }) + row({ icon: iconTile('sparkles', 'var(--indigo)', 30), title: 'Neue Wörter', detail: neu }), 'Pro Runde kommen bis zu 15 Wörter dran – zuerst die fälligen, dann neue.')}
+    <button class="primary big" id="los">Los geht's</button>`;
   $('#los').onclick = () => artikelRound(duePool(pool, 'art', 15), 'kasten', kastenStart);
 }
 
@@ -249,52 +274,52 @@ function sortieren() {
   for (const a of ARTS) items.push(...weakFirst(pool.filter(w => w.artikel === a), 'art', 3));
   items = shuffle(items);
   if (!items.length) return emptyView('Keine Wörter für diese Auswahl.');
-  let ok = 0, fehler = 0; const wrong = new Set(); let selected = null;
-  view.innerHTML = `<p class="center muted">Ziehe jedes Wort in die richtige Kiste – oder tippe erst das Wort und dann die Kiste.</p>
-    <div class="pile">${items.map(w => `<div class="chip" data-id="${w.id}">${w.bild ? `<img src="${esc(w.bild)}" alt="" draggable="false" onerror="this.remove()">` : ''}${esc(w.wort)}</div>`).join('')}</div>
+  let ok = 0; const wrong = new Set(); let selected = null;
+  view.innerHTML = `${navBar('Sortieren', `<span class="counter" id="cnt">0/${items.length}</span>`)}
+    <p class="center muted" style="margin:6px 0 16px">Ziehe jedes Wort in die richtige Kiste – oder tippe erst das Wort und dann die Kiste.</p>
+    <div class="pile">${items.map(w => `<div class="chip-word ${w.bild ? '' : 'no-img'}" data-id="${w.id}">${w.bild ? thumbHTML(w) : ''}${esc(w.wort)}</div>`).join('')}</div>
     <div class="bins">${ARTS.map(a => `<div class="bin ${a}" data-a="${a}"><h4>${a}</h4></div>`).join('')}</div>`;
+  let placed = 0;
   const drop = (chip, bin) => {
     const w = BYID[chip.dataset.id];
-    const a = bin.dataset.a;
-    if (a === w.artikel) {
-      if (!wrong.has(w.id)) { grade('art', w, true, 'sort'); ok++; } else grade('art', w, true, 'sort');
-      beep(true); say(fullText(w));
-      chip.remove();
+    if (bin.dataset.a === w.artikel) {
+      if (!wrong.has(w.id)) ok++;
+      grade('art', w, true, 'sort'); beep(true); say(fullText(w));
+      chip.remove(); placed++; $('#cnt').textContent = `${placed}/${items.length}`;
       bin.insertAdjacentHTML('beforeend', `<div class="done">${esc(w.wort)}</div>`);
-      if (!$$('.pile .chip').length) later(() => resultView('sort', ok, items.length, [...wrong].map(id => BYID[id]), sortieren), 700);
+      if (!$$('.pile .chip-word').length) later(() => resultView('sort', ok, items.length, [...wrong].map(id => BYID[id]), sortieren), 700);
     } else {
-      fehler++; beep(false);
+      beep(false);
       if (!wrong.has(w.id)) { wrong.add(w.id); grade('art', w, false, 'sort'); }
-      chip.classList.remove('shake'); void chip.offsetWidth; chip.classList.add('shake');
-      bin.classList.remove('shake'); void bin.offsetWidth; bin.classList.add('shake');
+      for (const el of [chip, bin]) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
     }
   };
-  $$('.chip').forEach(chip => {
+  $$('.chip-word').forEach(chip => {
     chip.addEventListener('pointerdown', e => {
       e.preventDefault();
       const rect = chip.getBoundingClientRect();
       const dx = e.clientX - rect.left, dy = e.clientY - rect.top;
-      let moved = false, clone = null, overBin = null;
+      let moved = false, clone = null, over = null;
       const move = ev => {
         if (!moved && Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 8) return;
-        if (!moved) { moved = true; clone = chip.cloneNode(true); clone.classList.add('drag'); clone.style.width = rect.width + 'px'; document.body.appendChild(clone); chip.classList.add('ghost'); }
+        if (!moved) { moved = true; clone = chip.cloneNode(true); clone.classList.add('drag'); clone.classList.remove('sel'); clone.style.width = rect.width + 'px'; document.body.appendChild(clone); chip.classList.add('ghost'); }
         clone.style.left = (ev.clientX - dx) + 'px'; clone.style.top = (ev.clientY - dy) + 'px';
         const el = document.elementFromPoint(ev.clientX, ev.clientY);
         const b = el && el.closest('.bin');
-        if (overBin && overBin !== b) overBin.classList.remove('hover');
-        overBin = b; if (b) b.classList.add('hover');
+        if (over && over !== b) over.classList.remove('hover');
+        over = b; if (b) b.classList.add('hover');
       };
-      const up = ev => {
+      const up = () => {
         window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
         if (clone) clone.remove(); chip.classList.remove('ghost');
-        if (overBin) overBin.classList.remove('hover');
-        if (moved && overBin) drop(chip, overBin);
-        else if (!moved) { $$('.chip').forEach(c => c.style.borderColor = ''); selected = chip; chip.style.borderColor = 'var(--accent)'; say(BYID[chip.dataset.id].wort); }
+        if (over) over.classList.remove('hover');
+        if (moved && over) drop(chip, over);
+        else if (!moved) { $$('.chip-word').forEach(c => c.classList.remove('sel')); selected = chip; chip.classList.add('sel'); say(BYID[chip.dataset.id].wort); }
       };
       window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
     });
   });
-  $$('.bin').forEach(bin => bin.addEventListener('click', () => { if (selected && selected.isConnected) { const c = selected; selected = null; c.style.borderColor = ''; drop(c, bin); } }));
+  $$('.bin').forEach(bin => bin.addEventListener('click', () => { if (selected && selected.isConnected) { const c = selected; selected = null; c.classList.remove('sel'); drop(c, bin); } }));
 }
 
 /* ---------- Mehrzahl ---------- */
@@ -305,8 +330,7 @@ function umlaut(s) {
   return s.slice(0, m.index) + map[m[1]] + s.slice(m.index + m[1].length);
 }
 function pluralFakes(w) {
-  const b = w.wort, u = umlaut(b), real = w.plural;
-  const st = b.replace(/e$/, '');
+  const b = w.wort, u = umlaut(b), real = w.plural, st = b.replace(/e$/, '');
   const c = [b + 'e', b + 'en', b + 'n', b + 'er', b + 's', b, u + 'e', u + 'er', u, st + 'en', b + 'es'];
   return shuffle([...new Set(c)].filter(x => x !== real && !(b.endsWith('e') && x === b + 'e') && !/(.)\1\1/.test(x))).slice(0, 2);
 }
@@ -319,24 +343,27 @@ function mehrzahl() {
     if (i >= items.length) return resultView('plural', ok, items.length, wrong, mehrzahl);
     const w = items[i];
     const opts = shuffle([w.plural, ...pluralFakes(w)]);
-    view.innerHTML = `${progressBar(i, items.length)}<div class="qcard">
-      <button class="speak">🔊</button>${imgHTML(w)}
-      <div class="qword">${artWord(w)}</div>
-      <div class="qsub">Wie heißt die Mehrzahl?</div>
-      <div class="opts">${opts.map(o => `<button class="opt" data-o="${esc(o)}"><span class="c-die">die</span> ${esc(o)}</button>`).join('')}</div>
-      <div class="feedback"></div></div>`;
-    $('.speak').onclick = () => say(fullText(w));
+    view.innerHTML = `${progressNav(i, items.length)}<div class="stack">
+      <div class="question"><button class="icon-btn q-speak" id="spk">${ico('speaker', 20, 2)}</button>
+        <div class="q-meta"><span class="chip">Einzahl</span></div>${picHTML(w)}
+        <div class="q-main">${artWord(w)}</div><div class="q-sub">Wie heißt die Mehrzahl?</div></div>
+      <div class="options one">${opts.map(o => `<button class="option" data-o="${esc(o)}"><span class="die-word">die</span>${esc(o)}</button>`).join('')}</div>
+      <div id="fb"></div></div>`;
+    $('#spk').onclick = () => say(fullText(w));
     say(fullText(w));
     let done = false;
-    $$('.opt').forEach(b => b.onclick = () => {
+    $$('.option').forEach(b => b.onclick = () => {
       if (done) return; done = true;
       const right = b.dataset.o === w.plural;
       grade('pl', w, right, 'plural'); beep(right);
-      $$('.opt').forEach(x => { if (x.dataset.o === w.plural) x.classList.add('ok'); else if (x === b) x.classList.add('bad'); });
+      $$('.option').forEach(x => { if (x.dataset.o === w.plural) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); else x.classList.add('dim'); });
       say('die ' + w.plural);
-      const fb = $('.feedback');
-      if (right) { ok++; fb.className = 'feedback show ok'; fb.innerHTML = `✅ <b>Richtig!</b> ${artWord(w)} – die ${esc(w.plural)}${w.hinweis ? ruleHTML(w) : ''}`; later(() => { i++; show(); }, 1300); }
-      else { wrong.push(w); fb.className = 'feedback show bad'; fb.innerHTML = `❌ Richtig ist: <b>die ${esc(w.plural)}</b>${w.hinweis ? ruleHTML(w) : ''}<button class="btn next">Weiter ➜</button>`; $('.next').onclick = () => { i++; show(); }; }
+      if (right) { ok++; $('#fb').innerHTML = `<div class="feedback ok"><div class="fb-title">${ico('checkCircle', 24, 2)} Richtig!</div><div class="fb-line">${artWord(w)} – die ${esc(w.plural)}</div>${w.hinweis ? ruleHTML(w) : ''}</div>`; later(() => { i++; show(); }, 1300); }
+      else {
+        wrong.push(w);
+        $('#fb').innerHTML = `<div class="feedback no"><div class="fb-title">${ico('xmark', 24, 2.2)} Nicht ganz</div><div class="fb-line">Richtig ist: <b>die ${esc(w.plural)}</b></div>${w.hinweis ? ruleHTML(w) : ''}<div class="fb-actions"><button class="primary big" id="next">Weiter</button></div></div>`;
+        $('#next').onclick = () => { i++; show(); };
+      }
     });
   };
   show();
@@ -347,27 +374,24 @@ function rennen() {
   setTitle('Zeitrennen');
   const pool = nounPool();
   if (!pool.length) return emptyView('Keine Wörter für diese Auswahl.');
-  const best = P().best.rennen || 0;
-  view.innerHTML = `<div class="qcard result"><div class="big">⏱️</div>
-    <h2>Wie viele schaffst du in 60 Sekunden?</h2><p>Dein Rekord: <b>${best}</b></p>
-    <button class="btn" id="los">Start!</button></div>`;
+  view.innerHTML = `${navBar('Zeitrennen')}<div class="result"><div class="big-emoji">⏱️</div>
+    <h2>Wie viele schaffst du in 60 Sekunden?</h2><p class="muted">Dein Rekord: <b>${P().best.rennen || 0}</b></p>
+    <button class="primary big" id="los" style="max-width:420px">Start</button></div>`;
   $('#los').onclick = () => {
     let queue = shuffle(pool), score = 0, total = 0, left = 60, ended = false; const wrong = [];
     const tick = setInterval(() => {
-      left--; const t = $('.timer'); if (t) { t.textContent = left + ' s'; t.classList.toggle('low', left <= 10); }
+      left--; const t = $('#tmr'); if (t) { t.textContent = left + ' s'; t.classList.toggle('low', left <= 10); }
       if (left <= 0) end();
     }, 1000);
     const end = () => {
       if (ended) return; ended = true; clearInterval(tick);
       const rekord = score > (P().best.rennen || 0);
       if (rekord) P().best.rennen = score;
-      addStars(Math.floor(score / 3));
-      logRound('rennen', score, total);
-      view.innerHTML = `<div class="qcard result"><div class="big">${rekord ? '🏆' : '⏱️'}</div>
-        <div class="score">${score} richtig</div><p>${rekord ? 'Neuer Rekord!' : 'Rekord: ' + P().best.rennen}</p>
-        <p class="muted">+${Math.floor(score / 3)} Sterne</p>
-        ${wrong.length ? `<p>Falsch: ${wrong.slice(0, 12).map(w => artWord(w)).join(', ')}</p>` : ''}
-        <div class="row" style="justify-content:center"><button class="btn" id="again">🔁 Nochmal</button><button class="btn ghost" onclick="go('home')">🏠 Start</button></div></div>`;
+      addStars(Math.floor(score / 3)); logRound('rennen', score, total);
+      view.innerHTML = `${navBar('Zeitrennen')}<div class="result"><div class="big-emoji">${rekord ? '🏆' : '⏱️'}</div>
+        <div class="score">${score} richtig</div><h2>${rekord ? 'Neuer Rekord!' : 'Rekord: ' + P().best.rennen}</h2><p class="muted">+${Math.floor(score / 3)} Sterne</p>
+        ${wrong.length ? group('Falsch beantwortet', wrong.slice(0, 12).map(w => row({ icon: thumbHTML(w), title: artWord(w) })).join('')) : ''}
+        <div class="two"><button class="primary" id="again">${ico('repeat', 20, 2.2)} Nochmal</button><button class="secondary" data-close>Fertig</button></div></div>`;
       $('#again').onclick = rennen;
     };
     window.__stopTimer = () => { ended = true; clearInterval(tick); };
@@ -375,16 +399,16 @@ function rennen() {
       if (ended) return;
       if (!queue.length) queue = shuffle(pool);
       const w = queue.pop();
-      view.innerHTML = `<div class="timer">${left} s</div><div class="center muted">Punkte: <b>${score}</b></div>
-        <div class="qcard">${imgHTML(w)}<div class="qword">${esc(w.wort)}</div>
-        <div class="answers">${ARTS.map(a => `<button class="ans ${a}" data-a="${a}">${a}</button>`).join('')}</div></div>`;
+      view.innerHTML = `${navBar(`<span class="timer${left <= 10 ? ' low' : ''}" id="tmr">${left} s</span>`, `<span class="pill">${ico('star', 18, 2)} ${score}</span>`)}
+        <div class="stack"><div class="question">${picHTML(w)}<div class="q-main" id="qw">${esc(w.wort)}</div></div>
+        <div class="art-grid">${ARTS.map(a => `<button class="art-btn ${a}" data-a="${a}">${a}</button>`).join('')}</div></div>`;
       let done = false;
-      $$('.ans').forEach(b => b.onclick = () => {
+      $$('.art-btn').forEach(b => b.onclick = () => {
         if (done || ended) return; done = true; total++;
         const right = b.dataset.a === w.artikel;
         grade('art', w, right, 'rennen'); beep(right);
         if (right) { score++; next(); }
-        else { wrong.push(w); $('.qword').innerHTML = artWord(w); $$('.ans').forEach(x => x.classList.toggle('dim', x.dataset.a !== w.artikel)); later(next, 900); }
+        else { wrong.push(w); $('#qw').innerHTML = artWord(w); $$('.art-btn').forEach(x => x.classList.toggle('dim', x.dataset.a !== w.artikel)); later(next, 900); }
       });
     };
     next();
@@ -397,23 +421,25 @@ function hoeren() {
   const items = weakFirst(vocPool(), 'voc', ST().runde);
   if (!items.length) return emptyView('Keine Wörter für diese Auswahl.');
   let i = 0, ok = 0; const wrong = [];
-  const speakWord = (w, rate) => { say(w.artikel ? fullText(w) : w.wort, rate); };
+  const speakWord = (w, rate) => say(w.artikel ? fullText(w) : w.wort, rate);
   const show = () => {
     if (i >= items.length) return resultView('hoeren', ok, items.length, wrong, hoeren);
     const w = items[i];
     const gap = gapSentence(w);
-    view.innerHTML = `${progressBar(i, items.length)}<div class="qcard">
-      <div class="row" style="justify-content:center;gap:12px">
-        <button class="btn" id="hear">🔊 Hören</button><button class="btn ghost" id="slow">🐢 Langsam</button>
-        ${w.beispiel ? '<button class="btn ghost" id="satz">💬 Satz</button>' : ''}
+    view.innerHTML = `${progressNav(i, items.length)}<div class="stack">
+      <div class="question">
+        <div class="q-meta"><span class="chip">${esc(w.wortart)}</span></div>
+        ${w.wortart === 'Nomen' ? picHTML(w) : ''}
+        <div class="btn-row"><button class="primary small-btn" id="hear">${ico('speaker', 18, 2)} Hören</button>
+          <button class="secondary small-btn" id="slow">${ico('turtle', 18, 2)} Langsam</button>
+          ${w.beispiel ? `<button class="secondary small-btn" id="satz">${ico('bubble', 18, 2)} Satz</button>` : ''}</div>
+        ${gap ? `<div class="gap-sentence">${gap}</div>` : ''}
       </div>
-      ${w.wortart === 'Nomen' ? imgHTML(w) : ''}
-      <p><span class="tag">${esc(w.wortart)}</span></p>
-      ${gap ? `<p style="font-size:22px">${gap}</p>` : ''}
-      <input class="typein" id="inp" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="${w.wortart === 'Nomen' ? 'Nomen ohne Artikel' : 'Schreibe das Wort'}">
-      <div class="row" style="justify-content:center;margin-top:10px">${['ä', 'ö', 'ü', 'ß', 'Ä', 'Ö', 'Ü'].map(c => `<button class="btn ghost small key">${c}</button>`).join('')}</div>
-      <div class="feedback"></div>
-      <button class="btn next" id="check">Prüfen ✔</button></div>`;
+      <div class="field"><div class="field-label">${w.wortart === 'Nomen' ? 'Nomen ohne Artikel' : 'Deine Antwort'}</div>
+        <input class="text-input typein" id="inp" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="key-bar">${['ä', 'ö', 'ü', 'ß', 'Ä', 'Ö', 'Ü'].map(c => `<button class="key">${c}</button>`).join('')}</div>
+      <div id="fb"></div>
+      <button class="primary big" id="check">Prüfen</button></div>`;
     const inp = $('#inp');
     $('#hear').onclick = () => speakWord(w);
     $('#slow').onclick = () => speakWord(w, .55);
@@ -429,19 +455,17 @@ function hoeren() {
       done = true;
       const right = v === w.wort;
       grade('voc', w, right, 'hoeren'); beep(right);
-      const fb = $('.feedback');
-      if (right) { ok++; fb.className = 'feedback show ok'; fb.innerHTML = `✅ <b>Richtig!</b> ${artWord(w)}${w.formen ? `<div class="small muted">${esc(w.formen)}</div>` : ''}`; }
+      const ex = w.beispiel ? `<div class="fb-ex">${esc(w.beispiel)}</div>` : '';
+      if (right) { ok++; $('#fb').innerHTML = `<div class="feedback ok"><div class="fb-title">${ico('checkCircle', 24, 2)} Richtig!</div><div class="fb-line">${artWord(w)}</div>${w.formen ? `<div class="fb-ex">${esc(w.formen)}</div>` : ''}${ex}</div>`; }
       else {
         wrong.push(w);
         const caseOnly = v.toLowerCase() === w.wort.toLowerCase();
-        fb.className = 'feedback show bad';
-        fb.innerHTML = `${caseOnly ? '🔠 Fast! Achte auf die Groß- und Kleinschreibung.' : '❌ Nicht ganz.'}
-          <div class="diff" style="margin-top:8px">Du: ${diffHTML(v, w.wort)}</div>
-          <div class="diff">Richtig: <span>${artWord(w)}</span></div>
-          ${w.wortart === 'Nomen' ? '<div class="small muted">Nomen schreibt man groß.</div>' : ''}`;
+        $('#fb').innerHTML = `<div class="feedback ${caseOnly ? 'almost' : 'no'}"><div class="fb-title">${ico(caseOnly ? 'triangle' : 'xmark', 24, 2)} ${caseOnly ? 'Fast! Groß oder klein?' : 'Nicht ganz'}</div>
+          <div class="diff">${diffHTML(v, w.wort)}</div><div class="fb-line">Richtig: <b>${artWord(w)}</b></div>
+          ${w.wortart === 'Nomen' ? '<div class="fb-ex">Nomen schreibt man groß.</div>' : ''}${ex}</div>`;
       }
-      if (w.beispiel) fb.insertAdjacentHTML('beforeend', `<div class="small muted" style="margin-top:6px">${esc(w.beispiel)}</div>`);
-      $('#check').textContent = 'Weiter ➜';
+      inp.blur();
+      $('#check').textContent = 'Weiter';
     };
     $('#check').onclick = check;
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
@@ -450,10 +474,7 @@ function hoeren() {
 }
 function diffHTML(a, b) {
   let h = '';
-  for (let k = 0; k < Math.max(a.length, b.length); k++) {
-    const c = a[k] ?? '·';
-    h += `<span class="${a[k] === b[k] ? '' : 'x'}">${esc(c)}</span>`;
-  }
+  for (let k = 0; k < Math.max(a.length, b.length); k++) h += `<span class="${a[k] === b[k] ? '' : 'x'}">${esc(a[k] ?? '·')}</span>`;
   return h;
 }
 
@@ -467,37 +488,38 @@ function salat() {
     if (i >= items.length) return resultView('salat', ok, items.length, wrong, salat);
     const w = items[i];
     const letters = [...w.wort];
-    let mix = shuffle(letters); let tries = 0;
+    let mix = shuffle(letters), tries = 0;
     while (mix.join('') === w.wort && tries++ < 10) mix = shuffle(letters);
     const gap = gapSentence(w);
-    view.innerHTML = `${progressBar(i, items.length)}<div class="qcard">
-      <button class="speak">🔊</button>
-      ${w.wortart === 'Nomen' ? imgHTML(w) : ''}
-      <p><span class="tag">${esc(w.wortart)}</span></p>
-      ${gap ? `<p style="font-size:22px">${gap}</p>` : ''}
-      <div class="slots">${letters.map(() => '<div class="slot"></div>').join('')}</div>
-      <div class="tiles">${mix.map((c, k) => `<button class="ltile" data-k="${k}">${esc(c)}</button>`).join('')}</div>
-      <div class="row" style="justify-content:center;margin-top:14px"><button class="btn ghost" id="back">⌫ Zurück</button></div>
-      <div class="feedback"></div></div>`;
+    view.innerHTML = `${progressNav(i, items.length)}<div class="stack">
+      <div class="question"><button class="icon-btn q-speak" id="spk">${ico('speaker', 20, 2)}</button>
+        <div class="q-meta"><span class="chip">${esc(w.wortart)}</span></div>
+        ${w.wortart === 'Nomen' ? picHTML(w) : ''}${gap ? `<div class="gap-sentence">${gap}</div>` : ''}
+        <div class="slots">${letters.map(() => '<div class="slot"></div>').join('')}</div></div>
+      <div class="letters">${mix.map((c, k) => `<button class="letter" data-k="${k}">${esc(c)}</button>`).join('')}</div>
+      <div class="btn-row"><button class="secondary small-btn" id="back">${ico('delete', 18, 2)} Zurück</button></div>
+      <div id="fb"></div></div>`;
     const typed = [];
-    $('.speak').onclick = () => say(w.artikel ? fullText(w) : w.wort);
-    say(w.artikel ? fullText(w) : w.wort);
+    const speakIt = () => say(w.artikel ? fullText(w) : w.wort);
+    $('#spk').onclick = speakIt; speakIt();
     const paint = () => $$('.slot').forEach((s, k) => { const has = typed[k] !== undefined; s.textContent = has ? mix[typed[k]] : ''; s.classList.toggle('f', has); });
     let done = false;
-    $$('.ltile').forEach(t => t.onclick = () => {
+    $$('.letter').forEach(t => t.onclick = () => {
       if (done) return;
       typed.push(+t.dataset.k); t.classList.add('used'); paint();
       if (typed.length === letters.length) {
         done = true;
-        const v = typed.map(k => mix[k]).join('');
-        const right = v === w.wort;
+        const right = typed.map(k => mix[k]).join('') === w.wort;
         grade('voc', w, right, 'salat'); beep(right);
-        const fb = $('.feedback');
-        if (right) { ok++; fb.className = 'feedback show ok'; fb.innerHTML = `✅ <b>Richtig!</b> ${artWord(w)}`; say(w.artikel ? fullText(w) : w.wort); later(() => { i++; show(); }, 1300); }
-        else { wrong.push(w); fb.className = 'feedback show bad'; fb.innerHTML = `❌ Richtig ist: <b>${artWord(w)}</b><button class="btn next">Weiter ➜</button>`; $('.next').onclick = () => { i++; show(); }; }
+        if (right) { ok++; $('#fb').innerHTML = `<div class="feedback ok"><div class="fb-title">${ico('checkCircle', 24, 2)} Richtig!</div><div class="fb-line">${artWord(w)}</div></div>`; speakIt(); later(() => { i++; show(); }, 1300); }
+        else {
+          wrong.push(w);
+          $('#fb').innerHTML = `<div class="feedback no"><div class="fb-title">${ico('xmark', 24, 2.2)} Nicht ganz</div><div class="fb-line">Richtig ist: <b>${artWord(w)}</b></div><div class="fb-actions"><button class="primary big" id="next">Weiter</button></div></div>`;
+          $('#next').onclick = () => { i++; show(); };
+        }
       }
     });
-    $('#back').onclick = () => { if (done || !typed.length) return; const k = typed.pop(); $(`.ltile[data-k="${k}"]`).classList.remove('used'); paint(); };
+    $('#back').onclick = () => { if (done || !typed.length) return; const k = typed.pop(); $(`.letter[data-k="${k}"]`).classList.remove('used'); paint(); };
   };
   show();
 }
@@ -512,34 +534,32 @@ function karten() {
     if (i >= items.length) return resultView('karten', ok, items.length, wrong, karten);
     const w = items[i];
     const gap = gapSentence(w);
-    view.innerHTML = `${progressBar(i, items.length)}
-      <div class="flip" id="flip"><div class="flipin">
-        <div class="face front">
-          ${w.wortart === 'Nomen' ? imgHTML(w) : ''}
-          <span class="tag">${esc(w.wortart)} · ${esc(STUFE_NAME[w.stufe])}</span>
-          ${gap ? `<p style="font-size:24px">${gap}</p>` : ''}
-          <button class="btn ghost small" id="fhear">🔊 Anhören</button>
-          <p style="font-size:20px">Anfangsbuchstabe: <b>${esc(w.wort[0])}</b> · ${w.wort.length} Buchstaben</p>
-          <p class="muted">Stell dir vor, wie man das Wort${w.artikel ? ' mit Artikel' : ''} schreibt. </p>
-          <span class="btn">🔄 Umdrehen</span>
+    view.innerHTML = `${progressNav(i, items.length)}
+      <div class="flip" id="flip"><div class="flip-in">
+        <div class="face front question">
+          <div class="q-meta"><span class="chip">${esc(w.wortart)}</span><span class="chip">${esc(STUFE_NAME[w.stufe])}</span></div>
+          ${w.wortart === 'Nomen' ? picHTML(w) : ''}
+          ${gap ? `<div class="gap-sentence">${gap}</div>` : ''}
+          <button class="secondary small-btn" id="fhear">${ico('speaker', 18, 2)} Anhören</button>
+          <div class="q-sub">Anfangsbuchstabe <b>${esc(w.wort[0])}</b> · ${w.wort.length} Buchstaben</div>
+          <div class="q-sub">Stell dir vor, wie man das Wort${w.artikel ? ' mit Artikel' : ''} schreibt.</div>
+          <span class="link">${ico('repeat', 18, 2)} Tippen zum Umdrehen</span>
         </div>
-        <div class="face back">
-          <div class="qword">${artWord(w)}</div>
-          ${w.plural ? `<div>Mehrzahl: <b>die ${esc(w.plural)}</b></div>` : ''}
-          ${w.formen ? `<div>${esc(w.formen)}</div>` : ''}
-          ${w.beispiel ? `<p style="font-size:20px">${esc(w.beispiel)}</p>` : ''}
-          ${w.artikel ? ruleHTML(w).replace(/class="rule"/g, 'class="rule small"') : ''}
+        <div class="face back question">
+          <div class="q-main">${artWord(w)}</div>
+          ${w.plural ? `<div class="q-sub">Mehrzahl: <b>die ${esc(w.plural)}</b></div>` : ''}
+          ${w.formen ? `<div class="q-sub">${esc(w.formen)}</div>` : ''}
+          ${w.beispiel ? `<div class="gap-sentence">${esc(w.beispiel)}</div>` : ''}
+          ${w.artikel ? ruleHTML(w) : ''}
         </div></div></div>
-      <div class="row" id="rate" style="justify-content:center;margin-top:16px;visibility:hidden">
-        <button class="btn ghost" data-r="0">😕 Noch üben</button><button class="btn" data-r="1">😀 Gewusst!</button>
-      </div>`;
+      <div class="two" id="rate" style="visibility:hidden"><button class="danger" data-r="0">Noch üben</button><button class="good" data-r="1">Gewusst</button></div>`;
     say(w.wort);
     $('#fhear').onclick = e => { e.stopPropagation(); say(w.wort); };
     $('#flip').onclick = () => {
       const f = $('#flip'); f.classList.toggle('on');
       if (f.classList.contains('on')) { $('#rate').style.visibility = 'visible'; say(w.artikel ? fullText(w) : w.wort); }
     };
-    $$('#rate .btn').forEach(b => b.onclick = () => {
+    $$('#rate button').forEach(b => b.onclick = () => {
       const right = b.dataset.r === '1';
       grade('voc', w, right, 'karten');
       if (right) ok++; else wrong.push(w);
@@ -553,22 +573,25 @@ function karten() {
 function liste() {
   setTitle('Wortliste');
   let art = 'Alle', stufe = 'Alle', q = '';
-  view.innerHTML = `<input class="search" id="q" placeholder="🔍 Wort suchen …" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-    <div class="chips" id="fa">${['Alle', ...WORTARTEN].map(a => `<button class="tog ${a === 'Alle' ? 'on' : ''}" data-v="${a}">${a}</button>`).join('')}</div>
-    <div class="chips" id="fs" style="margin:8px 0 12px">${['Alle', ...STUFEN].map(a => `<button class="tog ${a === 'Alle' ? 'on' : ''}" data-v="${a}">${a === 'Alle' ? 'Alle Klassen' : STUFE_NAME[a]}</button>`).join('')}</div>
-    <div class="muted small" id="cnt"></div><div class="list" id="lst"></div>`;
+  view.innerHTML = `${navBar('Wortliste', '', true)}
+    <div class="stack" style="margin-top:6px">
+    <input class="text-input search" id="q" placeholder="Wort suchen" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <div class="pill-tabs static" id="fa">${['Alle', ...WORTARTEN].map(a => `<button class="${a === 'Alle' ? 'on' : ''}" data-v="${a}">${a === 'Kleines Wort' ? 'Kleine Wörter' : a}</button>`).join('')}</div>
+    <div class="segmented" id="fs">${['Alle', ...STUFEN].map(a => `<button class="${a === 'Alle' ? 'on' : ''}" data-v="${a}">${a === 'Alle' ? 'Alle' : 'Kl. ' + a}</button>`).join('')}</div>
+    </div><div id="lst"></div>`;
   const draw = () => {
     const ql = q.toLowerCase();
     const arr = WORDS.filter(w => (art === 'Alle' || w.wortart === art) && (stufe === 'Alle' || w.stufe === stufe) && (!ql || w.wort.toLowerCase().includes(ql)))
       .sort((a, b) => a.wort.localeCompare(b.wort, 'de'));
-    $('#cnt').textContent = arr.length + ' Wörter';
-    $('#lst').innerHTML = arr.map(w => `<button class="li ${w.artikel ? 'bg-' + w.artikel : ''}" data-id="${w.id}">
-      ${w.bild ? `<img src="${esc(w.bild)}" alt="" loading="lazy" onerror="this.outerHTML='<span class=ph>Aa</span>'">` : '<span class="ph">Aa</span>'}
-      <span><b>${artWord(w)}</b><small>${w.plural ? 'die ' + esc(w.plural) : w.nurPlural ? 'nur Mehrzahl' : w.formen ? esc(w.formen) : esc(w.wortart)}</small></span></button>`).join('');
+    $('#lst').innerHTML = group(`${arr.length} ${arr.length === 1 ? 'Wort' : 'Wörter'}`, arr.slice(0, 400).map(w => row({
+      icon: thumbHTML(w), title: artWord(w),
+      sub: w.plural ? 'die ' + esc(w.plural) : w.nurPlural ? 'nur Mehrzahl' : w.formen ? esc(w.formen) : esc(w.wortart),
+      detail: `<span class="small">Kl. ${w.stufe}</span>`, attrs: `data-id="${w.id}"`
+    })).join('') || row({ title: '<span class="muted">Nichts gefunden</span>' }), arr.length > 400 ? 'Die ersten 400 Treffer – bitte genauer suchen.' : '');
   };
-  $('#lst').onclick = e => { const b = e.target.closest('.li'); if (!b) return; const w = BYID[b.dataset.id]; say((w.artikel ? fullText(w) : w.wort) + '. ' + (w.beispiel || '')); };
+  $('#lst').onclick = e => { const b = e.target.closest('[data-id]'); if (!b) return; const w = BYID[b.dataset.id]; say((w.artikel ? fullText(w) : w.wort) + '. ' + (w.beispiel || '')); };
   $('#q').oninput = e => { q = e.target.value.trim(); draw(); };
-  const chipGroup = (id, set) => $(id).onclick = e => { const b = e.target.closest('.tog'); if (!b) return; $$(id + ' .tog').forEach(x => x.classList.toggle('on', x === b)); set(b.dataset.v); draw(); };
+  const chipGroup = (id, set) => $(id).onclick = e => { const b = e.target.closest('button'); if (!b) return; $$(id + ' button').forEach(x => x.classList.toggle('on', x === b)); set(b.dataset.v); draw(); };
   chipGroup('#fa', v => art = v); chipGroup('#fs', v => stufe = v);
   draw();
 }
@@ -584,7 +607,7 @@ function regeln() {
     ['die', 'Weibliche Personen und Wörter auf -in', /(Frau|Oma|Mutter|Schwester|Tante|in)$/],
     ['das', 'Verkleinerungen auf -chen und -lein – immer das!', /(chen|lein)$/],
     ['das', 'Wörter auf -ment, -um, -nis', /(ment|eum|rum|nis)$/],
-    ['das', 'Aus Verben gemacht: das Essen, das Lesen, das Schwimmen', /^(Essen|Lesen|Schwimmen|Wissen)$/],
+    ['das', 'Aus Verben gemacht: das Essen, das Lesen', /^(Essen|Lesen|Schwimmen|Wissen)$/],
     ['das', 'Viele Wörter mit Ge- vorne', /^Ge(müse|schenk|witter|bäude|birge|fühl)/],
     ['das', 'Metalle', /^(Gold|Eisen)$/],
     ['der', 'Tage, Monate und Jahreszeiten', /^(Montag|Freitag|Januar|Mai|Winter|Sommer|Herbst|Frühling)$/],
@@ -592,12 +615,13 @@ function regeln() {
     ['der', 'Wörter auf -ling, -or, -ig, -ich', /(ling|or|ig|ich)$/],
     ['der', 'Himmelsrichtungen', /^Norden$/],
   ];
-  view.innerHTML = `<div class="panel"><h3>🧩 Zusammengesetzte Wörter</h3>
-    <p>Das <b>letzte</b> Wort bestimmt den Artikel:<br>${artWord({ artikel: 'das', wort: 'Haus' })} + ${artWord({ artikel: 'die', wort: 'Aufgabe' })} → ${artWord({ artikel: 'die', wort: 'Hausaufgabe' })}<br>
-    ${artWord({ artikel: 'die', wort: 'Sonne' })} + ${artWord({ artikel: 'die', wort: 'Blume' })} → ${artWord({ artikel: 'die', wort: 'Sonnenblume' })} · ${artWord({ artikel: 'der', wort: 'Fahrrad' })}? Nein: ${artWord({ artikel: 'das', wort: 'Fahrrad' })} wegen ${artWord({ artikel: 'das', wort: 'Rad' })}!</p></div>
-    ${ARTS.map(a => `<div class="panel bg-${a}"><h3 class="c-${a}" style="font-size:28px">${a}</h3>
-      ${R.filter(r => r[0] === a).map(r => `<p><b>${esc(r[1])}</b><br><span class="small">${ex(r[2], a)}</span></p>`).join('')}</div>`).join('')}
-    <div class="panel"><h3>💡 Profi-Tipp</h3><p>Lerne jedes Nomen immer <b>mit</b> Artikel und am besten mit Farbe: <span class="c-der">blau = der</span>, <span class="c-die">rot = die</span>, <span class="c-das">grün = das</span>. In der Mehrzahl heißt es immer <b class="c-die">die</b>.</p></div>`;
+  const A = (a, w) => artWord({ artikel: a, wort: w });
+  view.innerHTML = `${navBar('Merkregeln', '', true)}${pageHeader('Merkregeln', 'Tricks für der, die, das')}
+    <div class="card"><h3>Zusammengesetzte Wörter</h3>
+      <p>Das <b>letzte</b> Wort bestimmt den Artikel:</p>
+      <p>${A('das', 'Haus')} + ${A('die', 'Aufgabe')} → ${A('die', 'Hausaufgabe')}<br>${A('die', 'Sonne')} + ${A('die', 'Blume')} → ${A('die', 'Sonnenblume')}<br>${A('das', 'Fahrrad')} wegen ${A('das', 'Rad')}</p></div>
+    ${ARTS.map(a => group(`<span class="rule-art c-${a}">${a}</span>`, R.filter(r => r[0] === a).map(r => row({ title: esc(r[1]), sub: ex(r[2], a) })).join(''))).join('')}
+    <div class="tip">${ico('bulb', 24, 2)}<span>Lerne jedes Nomen immer <b>mit</b> Artikel und mit Farbe: <span class="c-der">blau = der</span>, <span class="c-die">rot = die</span>, <span class="c-das">grün = das</span>. In der Mehrzahl heißt es immer <b class="c-die">die</b>.</span></div>`;
 }
 
 /* ---------- Fortschritt ---------- */
@@ -607,30 +631,36 @@ function streak() {
   while (set.has(d.toISOString().slice(0, 10))) { n++; d = new Date(d - DAY); }
   return n;
 }
+const tage = n => n + (n === 1 ? ' Tag' : ' Tage');
+function dayChart(d) {
+  const days = [];
+  for (let k = 13; k >= 0; k--) { const dt = new Date(Date.now() - k * DAY).toISOString().slice(0, 10); days.push([dt, d.log.filter(l => new Date(l.t).toISOString().slice(0, 10) === dt).length]); }
+  const mx = Math.max(1, ...days.map(x => x[1]));
+  return `<div class="group-body"><div class="daychart">${days.map(([dt, n]) => `<div class="day" title="${n}"><div class="day-bar ${n ? '' : 'zero'}" style="height:${Math.max(4, n / mx * 100)}%"></div><span class="small muted">${new Date(dt).toLocaleDateString('de-DE', { weekday: 'narrow' })}</span></div>`).join('')}</div></div>`;
+}
 function fortschritt() {
-  setTitle('Mein Fortschritt');
+  setTitle('Fortschritt');
   const d = P();
   const nouns = NOUNS.filter(w => !w.nurPlural);
   const learned = w => { const r = d.art[w.id]; return r && r.b >= 4; };
   const boxes = [0, 0, 0, 0, 0]; nouns.forEach(w => { const r = d.art[w.id]; if (r) boxes[r.b - 1]++; });
-  const vocLearned = WORDS.filter(w => { const r = d.voc[w.id]; return r && r.b >= 3; }).length;
   const answers = d.log.length, right = d.log.filter(l => l.ok).length;
-  view.innerHTML = `<div class="grid" style="margin-bottom:16px">
-      <div class="tile"><span class="ic">⭐</span><b>${d.stars}</b><span>Sterne</span></div>
-      <div class="tile"><span class="ic">🔥</span><b>${streak()} ${streak() === 1 ? 'Tag' : 'Tage'}</b><span>am Stück geübt</span></div>
-      <div class="tile"><span class="ic">🎯</span><b>${answers ? Math.round(right / answers * 100) : 0} %</b><span>richtig (${answers} Antworten)</span></div>
-      <div class="tile"><span class="ic">⏱️</span><b>${d.best.rennen || 0}</b><span>Rekord Zeitrennen</span></div>
+  const meter = (l, n, color = 'var(--green)') => `<span class="bar-meter"><span style="width:${n ? l / n * 100 : 0}%;background:${color}"></span></span>`;
+  view.innerHTML = `${pageHeader('Fortschritt', esc(curProfile().avatar + ' ' + curProfile().name))}
+    <div class="stat-grid">
+      <div class="stat"><span class="stat-n">${ico('star', 22, 2)}${d.stars}</span>Sterne</div>
+      <div class="stat"><span class="stat-n" style="color:var(--orange)">${ico('flame', 22, 2)}<span style="color:var(--label)">${streak()}</span></span>${streak() === 1 ? 'Tag' : 'Tage'} in Folge</div>
+      <div class="stat"><span class="stat-n">${answers ? Math.round(right / answers * 100) : 0} %</span>richtig</div>
+      <div class="stat"><span class="stat-n">${d.best.rennen || 0}</span>Rekord Zeitrennen</div>
     </div>
-    <div class="panel"><h3>🗃️ Artikel-Karteikasten (alle Klassen)</h3>
-      <div class="boxes">${boxes.map((c, k) => `<div>Fach ${k + 1}<b>${c}</b></div>`).join('')}</div>
-      <p class="small muted">Ab Fach 4 gilt ein Wort als „sicher gelernt“. Sicher: <b>${nouns.filter(learned).length}</b> von ${nouns.length} Nomen.</p></div>
-    <div class="panel"><h3>📚 Artikel nach Themen</h3>
-      ${THEMEN.map(t => { const ws = nouns.filter(w => w.thema === t); const l = ws.filter(learned).length; return `<div class="bar"><span class="lbl">${t}</span><span class="track"><i style="width:${ws.length ? l / ws.length * 100 : 0}%"></i></span><span class="val">${l}/${ws.length}</span></div>`; }).join('')}
-    </div>
-    <div class="panel"><h3>✏️ Wörter lernen</h3>
-      ${STUFEN.map(s => { const ws = WORDS.filter(w => w.stufe === s); const l = ws.filter(w => { const r = d.voc[w.id]; return r && r.b >= 3; }).length; return `<div class="bar"><span class="lbl">${STUFE_NAME[s]}</span><span class="track"><i style="width:${l / ws.length * 100}%"></i></span><span class="val">${l}/${ws.length}</span></div>`; }).join('')}
-      <p class="small muted">Insgesamt ${vocLearned} Wörter sicher geschrieben.</p></div>
-    <div class="panel"><h3>🕑 Letzte Runden</h3>${d.rounds.length ? `<table><tr><th>Wann</th><th>Übung</th><th>Ergebnis</th></tr>${d.rounds.slice(-10).reverse().map(r => `<tr><td>${new Date(r.t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</td><td>${MODE[r.m] || r.m}</td><td>${r.ok}/${r.n}</td></tr>`).join('')}</table>` : '<p class="muted">Noch keine Runde gespielt.</p>'}</div>`;
+    <section class="group"><h2 class="group-header">Letzte 14 Tage</h2>${dayChart(d)}</section>
+    <section class="group"><h2 class="group-header">Artikel-Karteikasten</h2>
+      <div class="boxes">${boxes.map((c, k) => `<div class="stat"><span class="stat-n">${c}</span>Fach ${k + 1}</div>`).join('')}</div>
+      <p class="group-footer">Ab Fach 4 gilt ein Wort als sicher. Sicher: ${nouns.filter(learned).length} von ${nouns.length} Nomen.</p></section>
+    ${group('Artikel nach Themen', THEMEN.map(t => { const ws = nouns.filter(w => w.thema === t); const l = ws.filter(learned).length; return row({ title: t, detail: `${meter(l, ws.length)}<span class="small" style="min-width:52px;text-align:right">${l}/${ws.length}</span>` }); }).join(''))}
+    ${group('Wörter richtig schreiben', STUFEN.map(s => { const ws = WORDS.filter(w => w.stufe === s); const l = ws.filter(w => { const r = d.voc[w.id]; return r && r.b >= 3; }).length; return row({ title: STUFE_NAME[s], detail: `${meter(l, ws.length, 'var(--accent)')}<span class="small" style="min-width:52px;text-align:right">${l}/${ws.length}</span>` }); }).join(''))}
+    ${group('Letzte Runden', d.rounds.length ? d.rounds.slice(-10).reverse().map(r => row({ title: MODE[r.m] || r.m, sub: new Date(r.t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }), detail: `${r.ok}/${r.n}` })).join('') : row({ title: '<span class="muted">Noch keine Runde gespielt</span>' }))}`;
+  $$('.bar-meter').forEach(m => m.style.width = '120px');
 }
 const MODE = { quiz: 'Artikel-Quiz', kasten: 'Karteikasten', fehler: 'Fehlerwörter', sort: 'Sortieren', plural: 'Mehrzahl', rennen: 'Zeitrennen', hoeren: 'Hören & Schreiben', salat: 'Buchstabensalat', karten: 'Lernkarten' };
 
@@ -640,33 +670,30 @@ function eltern() {
   setTitle('Elternbereich');
   if (!elternOK) {
     const a = 6 + Math.floor(Math.random() * 7), b = 6 + Math.floor(Math.random() * 7);
-    view.innerHTML = `<div class="qcard result"><div class="big">🔒</div><h2>Nur für Eltern</h2>
-      <p>Bitte rechne: <b>${a} × ${b}</b></p>
-      <input class="typein" id="pin" inputmode="numeric" style="max-width:220px"><br><br>
-      <button class="btn" id="ok">Öffnen</button></div>`;
-    const tryIt = () => { if (+$('#pin').value === a * b) { elternOK = true; eltern(); } else { $('#pin').classList.add('shake'); setTimeout(() => $('#pin').classList.remove('shake'), 400); } };
-    $('#ok').onclick = tryIt; $('#pin').onkeydown = e => { if (e.key === 'Enter') tryIt(); };
+    view.innerHTML = `${navBar('', '', true)}<div class="aurora-bg"></div><div class="center-screen" style="min-height:70vh"><div class="glass-card">
+      ${iconTile('lock', 'var(--accent)', 56)}<h1>Nur für Eltern</h1><p class="muted">Bitte rechne: <b>${a} × ${b}</b></p>
+      <form id="gate"><input id="pin" inputmode="numeric" autocomplete="off" placeholder="Ergebnis"><button class="primary big">Öffnen</button></form></div></div>`;
+    $('#gate').onsubmit = e => { e.preventDefault(); if (+$('#pin').value === a * b) { elternOK = true; eltern(); } else { $('#pin').classList.add('shake'); setTimeout(() => $('#pin').classList.remove('shake'), 400); } };
     return;
   }
   const d = P();
-  const errs = (kind) => Object.entries(d[kind]).filter(([, r]) => r.err > 0).sort((x, y) => y[1].err - x[1].err).slice(0, 15)
-    .map(([id, r]) => BYID[id] ? `<tr><td>${artWord(BYID[id])}</td><td>${r.err}</td><td>${r.ok}</td><td>Fach ${r.b}</td></tr>` : '').join('');
-  const days = [];
-  for (let k = 13; k >= 0; k--) { const dt = new Date(Date.now() - k * DAY).toISOString().slice(0, 10); days.push([dt, d.log.filter(l => new Date(l.t).toISOString().slice(0, 10) === dt).length]); }
-  const mx = Math.max(1, ...days.map(x => x[1]));
-  view.innerHTML = `<div class="panel"><h3>👤 Profil: ${esc(curProfile().avatar)} ${esc(curProfile().name)}</h3>
-      <p>${d.log.length} Antworten · ${d.log.length ? Math.round(d.log.filter(l => l.ok).length / d.log.length * 100) : 0} % richtig · ${d.days.length} ${d.days.length === 1 ? "Übungstag" : "Übungstage"} · ⭐ ${d.stars}</p></div>
-    <div class="panel"><h3>📅 Aktivität (letzte 14 Tage)</h3>
-      ${days.map(([dt, n]) => `<div class="bar"><span class="lbl">${new Date(dt).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}</span><span class="track"><i style="width:${n / mx * 100}%;background:var(--accent)"></i></span><span class="val">${n}</span></div>`).join('')}</div>
-    <div class="panel"><h3>❗ Häufigste Fehler – Artikel</h3>${errs('art') ? `<table><tr><th>Wort</th><th>Falsch</th><th>Richtig</th><th>Stand</th></tr>${errs('art')}</table>` : '<p class="muted">Noch keine Fehler.</p>'}</div>
-    <div class="panel"><h3>❗ Häufigste Fehler – Schreiben</h3>${errs('voc') ? `<table><tr><th>Wort</th><th>Falsch</th><th>Richtig</th><th>Stand</th></tr>${errs('voc')}</table>` : '<p class="muted">Noch keine Fehler.</p>'}</div>
-    <div class="panel"><h3>🧰 Verwaltung</h3><div class="row">
-      <button class="btn ghost" id="csv">⬇️ Export als CSV</button>
-      <button class="btn ghost" onclick="go('einstellungen')">⚙️ Einstellungen</button>
-      <button class="btn ghost" onclick="go('profile')">👥 Profile</button>
-      <button class="btn ghost" onclick="go('quellen')">📜 Quellen & Lizenzen</button>
-      <button class="btn ghost" id="reset">🗑️ Fortschritt zurücksetzen</button>
-      <button class="btn ghost" id="del">❌ Profil löschen</button></div></div>`;
+  const errs = kind => Object.entries(d[kind]).filter(([, r]) => r.err > 0).sort((x, y) => y[1].err - x[1].err).slice(0, 15).filter(([id]) => BYID[id])
+    .map(([id, r]) => row({ icon: thumbHTML(BYID[id]), title: artWord(BYID[id]), sub: `${r.ok}× richtig · Fach ${r.b}`, detail: `<span style="color:var(--red);font-weight:600">${r.err}× falsch</span>` })).join('');
+  view.innerHTML = `${navBar('', '', true)}${pageHeader('Elternbereich', `${esc(curProfile().avatar)} ${esc(curProfile().name)}`)}
+    <div class="stat-grid">
+      <div class="stat"><span class="stat-n">${d.log.length}</span>Antworten</div>
+      <div class="stat"><span class="stat-n">${d.log.length ? Math.round(d.log.filter(l => l.ok).length / d.log.length * 100) : 0} %</span>richtig</div>
+      <div class="stat"><span class="stat-n">${d.days.length}</span>${d.days.length === 1 ? 'Übungstag' : 'Übungstage'}</div>
+      <div class="stat"><span class="stat-n">${d.stars}</span>Sterne</div></div>
+    <section class="group"><h2 class="group-header">Aktivität (Antworten pro Tag)</h2>${dayChart(d)}</section>
+    ${group('Häufigste Fehler – Artikel', errs('art') || row({ title: '<span class="muted">Noch keine Fehler</span>' }))}
+    ${group('Häufigste Fehler – Schreiben', errs('voc') || row({ title: '<span class="muted">Noch keine Fehler</span>' }))}
+    ${group('Verwaltung',
+    row({ icon: iconTile('download', 'var(--blue)', 30), title: 'Export als CSV', sub: 'Alle Antworten aller Profile', chev: true, attrs: 'id="csv"' }) +
+    row({ icon: iconTile('gear', 'var(--gray)', 30), title: 'Einstellungen', chev: true, attrs: 'data-go="einstellungen"' }) +
+    row({ icon: iconTile('people', 'var(--teal)', 30), title: 'Profile', chev: true, attrs: 'data-go="profile"' }) +
+    row({ icon: iconTile('doc', 'var(--indigo)', 30), title: 'Quellen & Lizenzen', chev: true, attrs: 'data-go="quellen"' }))}
+    ${group('', row({ title: 'Fortschritt zurücksetzen', attrs: 'id="reset"', cls: 'row-destructive' }) + row({ title: 'Profil löschen', attrs: 'id="del"', cls: 'row-destructive' }), 'Zurücksetzen löscht Sterne, Karteikasten und Statistik dieses Profils. Die Einstellungen bleiben.')}`;
   $('#csv').onclick = exportCSV;
   $('#reset').onclick = () => { if (confirm(`Fortschritt von ${curProfile().name} wirklich löschen?`)) { const s = d.settings; S.data[S.current] = newData(); S.data[S.current].settings = s; save(); toast('Zurückgesetzt'); go('home'); } };
   $('#del').onclick = () => {
@@ -691,28 +718,27 @@ function einstellungen() {
   setTitle('Einstellungen');
   const s = ST();
   const voices = window.speechSynthesis ? speechSynthesis.getVoices().filter(v => (v.lang || '').toLowerCase().startsWith('de')) : [];
-  const tg = (group, val, on, label) => `<button class="tog ${on ? 'on' : ''}" data-g="${group}" data-v="${esc(val)}">${esc(label || val)}</button>`;
-  view.innerHTML = `<div class="panel"><h3>🎒 Welche Klassen?</h3><div class="chips">${STUFEN.map(x => tg('stufen', x, s.stufen.includes(x), STUFE_NAME[x])).join('')}</div></div>
-    <div class="panel"><h3>🗂️ Welche Themen? <span class="small muted">(keins gewählt = alle)</span></h3><div class="chips">${THEMEN.map(x => tg('themen', x, s.themen.includes(x))).join('')}</div></div>
-    <div class="panel"><h3>✏️ Wortarten beim Wörter-Lernen</h3><div class="chips">${WORTARTEN.map(x => tg('wortarten', x, s.wortarten.includes(x))).join('')}</div></div>
-    <div class="panel"><h3>🔧 Sonstiges</h3>
-      <div class="field"><label>Wörter pro Runde</label><select id="runde">${[5, 10, 15, 20].map(n => `<option ${n === s.runde ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
-      <div class="field"><label>Vorlesen</label>${tg('tts', 'tts', s.tts, s.tts ? 'An 🔊' : 'Aus 🔇')}</div>
-      <div class="field"><label>Stimme</label><select id="stimme"><option value="">Automatisch</option>${voices.map(v => `<option ${v.name === s.stimme ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
-        <button class="btn ghost small" id="test">Test</button></div>
-      <div class="field"><label>Farben für der/die/das</label>${tg('farben', 'farben', s.farben, s.farben ? 'An 🎨' : 'Aus')}</div>
-    </div>
-    <p class="center"><button class="btn" onclick="go('home')">Fertig ✔</button></p>`;
-  view.onclick = e => {
-    const b = e.target.closest('.tog'); if (!b) return;
+  const pick = (g, v, label, on) => row({ title: label, detail: on ? `<span style="color:var(--accent)">${ico('check', 20, 2.4)}</span>` : '', attrs: `data-g="${g}" data-v="${esc(v)}"` });
+  view.innerHTML = `${navBar('', '', true)}${pageHeader('Einstellungen')}
+    ${group('Klassen', STUFEN.map(x => pick('stufen', x, STUFE_NAME[x], s.stufen.includes(x))).join(''), 'Klasse 1/2 und 3/4: Grundwortschatz LehrplanPLUS Bayern. Klasse 5: Erweiterung.')}
+    ${group('Themen', pick('themen', '*', 'Alle Themen', !s.themen.length) + THEMEN.map(x => pick('themen', x, x, s.themen.includes(x))).join(''), 'Gilt für die Nomen.')}
+    ${group('Wortarten beim Wörter-Lernen', WORTARTEN.map(x => pick('wortarten', x, x === 'Kleines Wort' ? 'Kleine Wörter (aber, mit, nicht …)' : x, s.wortarten.includes(x))).join(''))}
+    ${group('Üben',
+    row({ icon: iconTile('checklist', 'var(--orange)', 30), title: 'Wörter pro Runde', detail: `<select id="runde">${[5, 10, 15, 20].map(n => `<option ${n === s.runde ? 'selected' : ''}>${n}</option>`).join('')}</select>` }) +
+    row({ icon: iconTile('speaker', 'var(--green)', 30), title: 'Vorlesen', detail: toggle('tts', s.tts) }) +
+    row({ icon: iconTile('bubble', 'var(--teal)', 30), title: 'Stimme', detail: `<select id="stimme"><option value="">Automatisch</option>${voices.map(v => `<option ${v.name === s.stimme ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>` }) +
+    row({ icon: iconTile('sparkles', 'var(--pink)', 30), title: 'Farben für der/die/das', sub: '<span class="c-der">blau</span> · <span class="c-die">rot</span> · <span class="c-das">grün</span>', detail: toggle('farben', s.farben) }) +
+    row({ title: 'Stimme testen', attrs: 'id="test"', cls: 'row-accent' }))}`;
+  $$('[data-g]').forEach(b => b.onclick = () => {
     const g = b.dataset.g, v = b.dataset.v;
-    if (g === 'tts' || g === 'farben') { s[g] = !s[g]; applyColors(); }
+    if (g === 'themen' && v === '*') s.themen = [];
     else {
       const arr = s[g]; const k = arr.indexOf(v);
       if (k >= 0) { if (g !== 'themen' && arr.length === 1) return toast('Mindestens eins auswählen'); arr.splice(k, 1); } else arr.push(v);
     }
-    save(); einstellungen();
-  };
+    save(); const y = scrollY; einstellungen(); scrollTo(0, y);
+  });
+  $$('[data-toggle]').forEach(t => t.onchange = () => { s[t.dataset.toggle] = t.checked; save(); applyColors(); });
   $('#runde').onchange = e => { s.runde = +e.target.value; save(); };
   $('#stimme').onchange = e => { s.stimme = e.target.value; save(); pickVoice(); say('der Hund, die Katze, das Pferd'); };
   $('#test').onclick = () => say('der Hund, die Katze, das Pferd');
@@ -721,22 +747,27 @@ function applyColors() { document.body.classList.toggle('nocolor', !!S.current &
 
 /* ---------- Profile ---------- */
 function profile() {
-  setTitle('Wer übt?');
-  view.innerHTML = `<div class="profiles">${S.profiles.map(p => `<button class="prof" data-id="${p.id}" style="${p.id === S.current ? 'border-color:var(--accent)' : ''}"><div class="av">${esc(p.avatar)}</div><b>${esc(p.name)}</b><span class="small muted">⭐ ${S.data[p.id]?.stars || 0}</span></button>`).join('')}
-    <button class="prof" id="neu"><div class="av">➕</div><b>Neues Profil</b></button></div>`;
-  $$('.prof[data-id]').forEach(b => b.onclick = () => { S.current = b.dataset.id; save(); pickVoice(); applyColors(); go('home'); });
+  setTitle('Profile');
+  if (!S.profiles.length) return neuesProfil();
+  view.innerHTML = `${S.current ? navBar('', '', true) : ''}${pageHeader('Wer übt?')}
+    ${group('Profile', S.profiles.map(p => row({ icon: `<span class="avatar">${esc(p.avatar)}</span>`, title: esc(p.name), sub: `${S.data[p.id]?.stars || 0} Sterne`, detail: p.id === S.current ? `<span style="color:var(--accent)">${ico('check', 20, 2.4)}</span>` : '', attrs: `data-pid="${p.id}"` })).join('') +
+    row({ icon: iconTile('person', 'var(--accent)', 30), title: 'Neues Profil', attrs: 'id="neu"', cls: 'row-accent' }))}`;
+  $$('[data-pid]').forEach(b => b.onclick = () => { S.current = b.dataset.pid; save(); pickVoice(); applyColors(); go('home'); });
   $('#neu').onclick = neuesProfil;
-  if (!S.profiles.length) neuesProfil();
 }
 function neuesProfil() {
   setTitle('Neues Profil');
+  document.body.classList.add('exercise');
   let av = AVATARE[Math.floor(Math.random() * AVATARE.length)];
-  view.innerHTML = `<div class="qcard"><h2>👋 Hallo! Wie heißt du?</h2>
-    <input class="typein" id="name" maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Dein Name">
-    <h3>Such dir ein Bild aus:</h3><div class="avatars">${AVATARE.map(a => `<button class="${a === av ? 'on' : ''}">${a}</button>`).join('')}</div>
-    <p class="center"><button class="btn" id="ok" style="margin-top:16px">Los geht's! 🚀</button></p></div>`;
-  $$('.avatars button').forEach(b => b.onclick = () => { av = b.textContent; $$('.avatars button').forEach(x => x.classList.toggle('on', x === b)); });
-  $('#ok').onclick = () => {
+  view.innerHTML = `${S.profiles.length ? navBar('', '', true) : ''}<div class="aurora-bg"></div><div class="center-screen" style="min-height:80vh"><div class="glass-card">
+    <div style="font-size:64px;line-height:1" id="avbig">${av}</div><h1>Hallo! Wie heißt du?</h1>
+    <form id="np"><input id="name" maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Dein Name">
+    <div class="field-label" style="text-align:left;margin-top:6px">Such dir ein Bild aus</div>
+    <div class="avatars">${AVATARE.map(a => `<button type="button" class="${a === av ? 'on' : ''}">${a}</button>`).join('')}</div>
+    <button class="primary big">Los geht's</button></form></div></div>`;
+  $$('.avatars button').forEach(b => b.onclick = () => { av = b.textContent; $('#avbig').textContent = av; $$('.avatars button').forEach(x => x.classList.toggle('on', x === b)); });
+  $('#np').onsubmit = e => {
+    e.preventDefault();
     const name = $('#name').value.trim();
     if (!name) { $('#name').classList.add('shake'); setTimeout(() => $('#name').classList.remove('shake'), 400); return; }
     const id = 'p' + Date.now().toString(36);
@@ -748,67 +779,119 @@ function neuesProfil() {
 function quellen() {
   setTitle('Quellen & Lizenzen');
   const photos = WORDS.filter(isPhoto);
-  view.innerHTML = `<div class="panel credits"><h3>📚 Wortschatz</h3>
-    <p>Klasse 1/2 und 3/4: Grundwortschatz aus dem LehrplanPLUS Grundschule Bayern (ISB, „Ergänzende Informationen zum LehrplanPLUS – Grundwortschatz“).
-    Klasse 5: eigene Erweiterung mit häufigen Nomen und Wörtern aus dem Unterricht der 5. Klasse. Beispielsätze, Merkregeln und Zuordnung zu Themen wurden für diese App erstellt.</p></div>
-    <div class="panel credits"><h3>🎨 Bilder</h3>
-    <p>Die meisten Bilder stammen von <a href="https://openmoji.org" target="_blank" rel="noopener">OpenMoji</a> – das offene Emoji-Projekt der Hochschule für Gestaltung Schwäbisch Gmünd. Lizenz: <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>.</p>
-    <p>Fotos von Wikimedia Commons:</p>
-    <table>${photos.map(w => `<tr><td>${esc(w.wort)}</td><td>${esc(w.bildQuelle.autor)}</td><td>${esc(w.bildQuelle.lizenz)}</td><td><a href="${esc(w.bildQuelle.seite)}" target="_blank" rel="noopener">Quelle</a></td></tr>`).join('')}</table>
-    <p>Abstrakte Wörter (z. B. die Angst, die Freiheit) haben absichtlich kein Bild.</p></div>`;
+  view.innerHTML = `${navBar('', '', true)}${pageHeader('Quellen & Lizenzen')}<div class="credits">
+    ${group('Wortschatz', row({ title: 'Klasse 1/2 und 3/4', sub: 'Grundwortschatz aus dem LehrplanPLUS Grundschule Bayern (ISB)' }) + row({ title: 'Klasse 5', sub: 'Eigene Erweiterung mit häufigen Wörtern der 5. Klasse' }), 'Beispielsätze, Merkregeln und Themen wurden für diese App erstellt.')}
+    ${group('Bilder', row({ title: '<a href="https://openmoji.org" target="_blank" rel="noopener">OpenMoji</a>', sub: 'Hochschule für Gestaltung Schwäbisch Gmünd · CC BY-SA 4.0' }) +
+    photos.map(w => row({ icon: thumbHTML(w), title: esc(w.wort), sub: `${esc(w.bildQuelle.autor)} · ${esc(w.bildQuelle.lizenz)}`, detail: `<a href="${esc(w.bildQuelle.seite)}" target="_blank" rel="noopener">Wikimedia</a>` })).join(''), 'Abstrakte Wörter (z. B. die Angst, die Freiheit) haben absichtlich kein Bild.')}
+    ${group('Gestaltung', row({ title: 'ipados27-ui', sub: 'Gemeinsame Gestaltung der Lern-Apps im Stil von iPadOS 27' }))}</div>`;
 }
 
-/* ---------- Startseite ---------- */
+/* ---------- Tabs: Heute / Artikel / Wörter / Fortschritt / Mehr ---------- */
+const TABS = [['home', 'house', 'Heute'], ['artikel', 'target', 'Artikel'], ['woerter', 'books', 'Wörter'], ['fortschritt', 'chart', 'Fortschritt'], ['mehr', 'ellipsis', 'Mehr']];
+function drawTabbar(active) {
+  $('#tabbar').innerHTML = TABS.map(([id, icon, label]) => `<button class="tab${id === active ? ' on' : ''}" data-go="${id}" ${id === active ? 'aria-current="page"' : ''}>${ico(icon, 25, id === active ? 2.1 : 1.7)}<span class="tab-label">${label}</span></button>`).join('');
+}
+function filterSummary() {
+  const s = ST();
+  return `${s.stufen.map(x => 'Kl. ' + x).join(' + ')} · ${s.themen.length ? s.themen.length + ' Themen' : 'alle Themen'}`;
+}
 function home() {
-  const p = curProfile(); const s = ST();
-  setTitle('Artikel lernen');
+  setTitle('Heute');
+  const p = curProfile();
   const np = nounPool(), vp = vocPool();
-  const fehlerN = errorWords(np, 'art').length;
-  const dueArt = dueCount(np, 'art'), dueVoc = dueCount(vp, 'voc');
-  const tile = (h, ic, t, sub, badge) => `<button class="tile" onclick="go('${h}')"><span class="ic">${ic}</span><b>${t}</b><span>${sub}</span>${badge ? `<span class="badge">${badge}</span>` : ''}</button>`;
-  view.innerHTML = `<div class="row"><h2 style="margin:6px 0">Hallo ${esc(p.name)}! ${esc(p.avatar)}</h2><span class="spacer"></span>
-      <button class="btn ghost small" onclick="go('einstellungen')">⚙️ ${s.stufen.map(x => STUFE_NAME[x].replace('Klasse ', 'Kl. ')).join(' + ')} · ${s.themen.length ? s.themen.length + ' Themen' : 'alle Themen'}</button></div>
-    <div class="section"><h2>der · die · das <span class="small muted">(${np.length} Nomen)</span></h2><div class="grid">
-      ${tile('quiz', '🎯', 'Artikel-Quiz', 'Bild ansehen, Artikel tippen')}
-      ${tile('sortieren', '🧺', 'Sortieren', 'Wörter in die richtige Kiste ziehen')}
-      ${tile('kasten', '🗃️', 'Karteikasten', 'Jeden Tag ein bisschen', dueArt ? dueArt + ' fällig' : '')}
-      ${tile('mehrzahl', '👯', 'Mehrzahl', 'ein Hund – viele Hunde')}
-      ${tile('rennen', '⏱️', 'Zeitrennen', '60 Sekunden – wie viele schaffst du?')}
-      ${tile('fehler', '🩹', 'Fehlerwörter', 'Was noch schwer ist', fehlerN || '')}
-    </div></div>
-    <div class="section"><h2>Wörter lernen <span class="small muted">(${vp.length} Wörter)</span></h2><div class="grid">
-      ${tile('hoeren', '🎧', 'Hören & Schreiben', 'Wort anhören und richtig schreiben')}
-      ${tile('salat', '🔤', 'Buchstabensalat', 'Buchstaben ordnen')}
-      ${tile('karten', '🃏', 'Lernkarten', 'Umdrehen und merken', dueVoc ? dueVoc + ' fällig' : '')}
-      ${tile('liste', '📖', 'Wortliste', 'Alle Wörter anschauen und anhören')}
-    </div></div>
-    <div class="grid">
-      ${tile('regeln', '💡', 'Merkregeln', 'Tricks für der, die, das')}
-      ${tile('fortschritt', '📈', 'Mein Fortschritt', `⭐ ${P().stars} · 🔥 ${streak()} ${streak() === 1 ? 'Tag' : 'Tage'}`)}
-      ${tile('profile', '👥', 'Profil wechseln', 'Wer übt gerade?')}
-      ${tile('eltern', '🔒', 'Eltern', 'Statistik, Export, Verwaltung')}
+  const dueArt = dueCount(np, 'art'), dueVoc = dueCount(vp, 'voc'), fehlerN = errorWords(np, 'art').length;
+  const datum = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  const st = streak();
+  const started = np.some(w => rec('art', w.id));
+  view.innerHTML = `${pageHeader(`Hallo ${esc(p.name)}!`, datum, `<span class="pill">${ico('star', 20, 2)} ${P().stars}</span>${st ? `<span class="pill"><span style="color:var(--orange);display:flex">${ico('flame', 20, 2)}</span>${st}</span>` : ''}`)}
+    <div class="widget-grid">
+      <button class="widget hero ${!dueArt && started ? 'success' : ''}" data-go="kasten">
+        <div class="widget-top">${iconTile('tray', 'var(--accent)', 44)}${dueArt ? `<span class="widget-count">${dueArt}</span>` : ''}</div>
+        <div><div class="widget-title">Karteikasten</div><div class="widget-sub">${dueArt ? `${dueArt} Artikel sind heute fällig` : started ? 'Alles wiederholt – jetzt neue Wörter lernen!' : 'Starte mit deinen ersten Wörtern'}</div></div>
+        <span class="widget-cta">Jetzt starten ${ico('chevronRight', 16, 2.4)}</span></button>
+      <button class="widget" data-go="quiz"><div class="widget-top">${iconTile('target', 'var(--der)', 34)}</div>
+        <div><div class="widget-title">Artikel-Quiz</div><div class="widget-sub">der, die oder das?</div></div></button>
+      <button class="widget" data-go="karten"><div class="widget-top">${iconTile('cards', 'var(--orange)', 34)}${dueVoc ? `<span class="widget-count">${dueVoc}</span>` : ''}</div>
+        <div><div class="widget-title">Lernkarten</div><div class="widget-sub">${dueVoc ? 'Wörter sind fällig' : 'Wörter merken'}</div></div></button>
+    </div>
+    ${group('Heute', row({ icon: iconTile('bandage', 'var(--red)', 30), title: 'Fehlerwörter', sub: fehlerN ? 'Was noch schwerfällt' : 'Keine – super!', detail: fehlerN || '', chev: true, attrs: 'data-go="fehler"' }) +
+    row({ icon: iconTile('timer', 'var(--teal)', 30), title: 'Zeitrennen', sub: `Rekord: ${P().best.rennen || 0}`, chev: true, attrs: 'data-go="rennen"' }) +
+    row({ icon: iconTile('gear', 'var(--gray)', 30), title: 'Auswahl', sub: filterSummary(), detail: `${np.length} Nomen`, chev: true, attrs: 'data-go="einstellungen"' }))}`;
+}
+function artikelTab() {
+  setTitle('Artikel');
+  const np = nounPool();
+  const dueArt = dueCount(np, 'art'), fehlerN = errorWords(np, 'art').length;
+  view.innerHTML = `${pageHeader('der · die · das', `${np.length} Nomen · ${filterSummary()}`)}
+    <div class="tile-grid three">
+      ${tileBtn('quiz', 'target', 'var(--der)', 'Artikel-Quiz', 'Bild ansehen, Artikel tippen')}
+      ${tileBtn('sortieren', 'squares', 'var(--das)', 'Sortieren', 'Wörter in die richtige Kiste ziehen')}
+      ${tileBtn('kasten', 'tray', 'var(--accent)', 'Karteikasten', 'Jeden Tag ein bisschen', dueArt)}
+      ${tileBtn('mehrzahl', 'people', 'var(--purple)', 'Mehrzahl', 'ein Hund – viele Hunde')}
+      ${tileBtn('rennen', 'timer', 'var(--teal)', 'Zeitrennen', '60 Sekunden – wie viele?')}
+      ${tileBtn('fehler', 'bandage', 'var(--die)', 'Fehlerwörter', 'Was noch schwerfällt', fehlerN)}
+    </div>
+    ${group('', row({ icon: iconTile('bulb', 'var(--yellow)', 30), title: 'Merkregeln', sub: '-ung → die, -chen → das …', chev: true, attrs: 'data-go="regeln"' }))}`;
+}
+function woerterTab() {
+  setTitle('Wörter');
+  const vp = vocPool(); const dueVoc = dueCount(vp, 'voc');
+  view.innerHTML = `${pageHeader('Wörter lernen', `${vp.length} Wörter · ${ST().wortarten.length === WORTARTEN.length ? 'alle Wortarten' : ST().wortarten.join(', ')}`)}
+    <div class="tile-grid">
+      ${tileBtn('hoeren', 'headphones', 'var(--blue)', 'Hören & Schreiben', 'Wort anhören und richtig schreiben')}
+      ${tileBtn('salat', 'shuffle', 'var(--pink)', 'Buchstabensalat', 'Buchstaben ordnen')}
+      ${tileBtn('karten', 'cards', 'var(--orange)', 'Lernkarten', 'Umdrehen und merken', dueVoc)}
+      ${tileBtn('liste', 'magnifier', 'var(--indigo)', 'Wortliste', 'Alle Wörter ansehen und anhören')}
     </div>`;
+}
+function mehrTab() {
+  setTitle('Mehr');
+  const p = curProfile();
+  view.innerHTML = `${pageHeader('Mehr')}
+    ${group('', row({ icon: `<span class="avatar">${esc(p.avatar)}</span>`, title: esc(p.name), sub: 'Profil wechseln oder neues anlegen', chev: true, attrs: 'data-go="profile"' }))}
+    ${group('', row({ icon: iconTile('gear', 'var(--gray)', 30), title: 'Einstellungen', sub: filterSummary(), chev: true, attrs: 'data-go="einstellungen"' }) +
+    row({ icon: iconTile('bulb', 'var(--yellow)', 30), title: 'Merkregeln', chev: true, attrs: 'data-go="regeln"' }) +
+    row({ icon: iconTile('magnifier', 'var(--indigo)', 30), title: 'Wortliste', chev: true, attrs: 'data-go="liste"' }))}
+    ${group('', row({ icon: iconTile('lock', 'var(--accent)', 30), title: 'Elternbereich', sub: 'Statistik, Export, Verwaltung', chev: true, attrs: 'data-go="eltern"' }) +
+    row({ icon: iconTile('doc', 'var(--blue)', 30), title: 'Quellen & Lizenzen', chev: true, attrs: 'data-go="quellen"' }))}`;
 }
 
 /* ---------- Router ---------- */
+const TAB_ROUTES = { home, artikel: artikelTab, woerter: woerterTab, fortschritt, mehr: mehrTab };
 const ROUTES = {
-  home, profile, einstellungen, eltern, fortschritt, regeln, liste, quellen,
-  quiz: () => { setTitle('Artikel-Quiz'); const go2 = () => artikelRound(weakFirst(nounPool(), 'art', ST().runde), 'quiz', go2); go2(); },
-  fehler: () => { setTitle('Fehlerwörter'); const go2 = () => artikelRound(errorWords(nounPool(), 'art').slice(0, ST().runde), 'fehler', go2); go2(); },
+  ...TAB_ROUTES, profile, einstellungen, eltern, regeln, liste, quellen,
+  quiz: () => { setTitle('Artikel-Quiz'); const g = () => artikelRound(weakFirst(nounPool(), 'art', ST().runde), 'quiz', g); g(); },
+  fehler: () => { setTitle('Fehlerwörter'); const g = () => artikelRound(errorWords(nounPool(), 'art').slice(0, ST().runde), 'fehler', g); g(); },
   kasten: kastenStart, sortieren, mehrzahl, rennen, hoeren, salat, karten,
 };
 function render() {
   RUN++;
   if (window.__stopTimer) { window.__stopTimer(); window.__stopTimer = null; }
   if (window.speechSynthesis) speechSynthesis.cancel();
-  view.onclick = null;
   let r = (location.hash || '#home').slice(1);
-  if (!S.current || !S.data[S.current]) { S.current = null; if (r !== 'profile') r = 'profile'; }
-  if (S.current) { const d = P(); for (const k of ['art', 'voc', 'pl']) d[k] = d[k] || {}; $('#starCount').textContent = P().stars; applyColors(); }
+  if (!S.current || !S.data[S.current]) { S.current = null; r = 'profile'; }
+  if (S.current) { const d = P(); for (const k of ['art', 'voc', 'pl']) d[k] = d[k] || {}; applyColors(); }
+  const isTab = r in TAB_ROUTES;
+  if (isTab) { lastTab = r; drawTabbar(r); }
+  document.body.classList.toggle('exercise', !isTab);
   (ROUTES[r] || home)();
   window.scrollTo(0, 0);
+  onScroll();
 }
-$('#btnHome').onclick = () => go(S.current ? 'home' : 'profile');
+function onScroll() {
+  const y = window.scrollY;
+  $$('.scroll-edge').forEach(el => el.classList.toggle('show', y > 44));
+  $$('.navbar').forEach(el => el.classList.toggle('scrolled', y > 4));
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-close]');
+  if (c) { e.preventDefault(); go(closeTarget()); return; }
+  const g = e.target.closest('[data-go]');
+  if (g) { e.preventDefault(); go(g.dataset.go); return; }
+  const s = e.target.closest('[data-say]');
+  if (s) say(s.dataset.say);
+});
 window.addEventListener('hashchange', render);
 
 fetch('words.json').then(r => r.json()).then(ws => {

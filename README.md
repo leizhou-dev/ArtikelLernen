@@ -28,3 +28,4 @@ Eine Lern-App für Grundschulkinder in Bayern: Sie übt die bestimmten Artikel, 
 - Sterne, Übungsserie in Tagen und Fortschritt nach Themen
 - Elternbereich mit Fehlerstatistik, Aktivität der letzten 14 Tage und CSV-Export
 - Quellen- und Lizenzangaben in der App
+- Gestaltung im Stil von iPadOS 27 (Liquid Glass), hell und dunkel nach Systemeinstellung
