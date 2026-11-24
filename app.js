@@ -89,13 +89,33 @@ function errorWords(pool, kind) {
 
 /* ---------- Ton & Sprache ---------- */
 let voice = null;
-function pickVoice() {
-  if (!window.speechSynthesis) return;
-  const vs = speechSynthesis.getVoices().filter(v => (v.lang || '').toLowerCase().startsWith('de'));
-  const pref = S.current && ST().stimme;
-  voice = vs.find(v => v.name === pref) || vs.find(v => /Anna|Petra|Helena|Markus|Google Deutsch/i.test(v.name)) || vs[0] || null;
+// Qualität einer Stimme: 3 = Premium, 2 = Erweitert, 1 = Standard, 0 = Spaßstimme (Eloquence/Novelty)
+const FUN_VOICES = /^(Eddy|Flo|Grandma|Grandpa|Oma|Opa|Reed|Rocko|Sandy|Shelley|Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Fred|Junior|Kathy|Ralph)\b/i;
+function voiceQuality(v) {
+  const id = `${v.name} ${v.voiceURI || ''}`;
+  if (/premium/i.test(id)) return 3;
+  if (/enhanced|erweitert|verbessert/i.test(id)) return 2;
+  if (FUN_VOICES.test(v.name)) return 0;
+  return 1;
 }
-if (window.speechSynthesis) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+const QUAL_LABEL = ['Spaßstimme', 'Standard', 'Erweitert', 'Premium'];
+function germanVoices() {
+  if (!window.speechSynthesis) return [];
+  return speechSynthesis.getVoices().filter(v => (v.lang || '').toLowerCase().startsWith('de'))
+    .sort((a, b) => voiceQuality(b) - voiceQuality(a) || a.name.localeCompare(b.name, 'de'));
+}
+function pickVoice() {
+  const vs = germanVoices();
+  const pref = S.current && ST().stimme;
+  // gespeicherte Stimme (voiceURI, früher: Name) – sonst beste Qualität, bevorzugt bekannte deutsche Stimmen
+  voice = (pref && (vs.find(v => v.voiceURI === pref) || vs.find(v => v.name === pref)))
+    || vs.filter(v => voiceQuality(v) > 0).sort((a, b) => voiceQuality(b) - voiceQuality(a) || (/Anna|Helena|Petra|Markus|Yannick|Martin/.test(b.name) - /Anna|Helena|Petra|Markus|Yannick|Martin/.test(a.name)))[0]
+    || vs[0] || null;
+}
+if (window.speechSynthesis) {
+  pickVoice();
+  speechSynthesis.onvoiceschanged = () => { pickVoice(); if (location.hash === '#einstellungen' && !$('#stimme:focus')) { const y = scrollY; einstellungen(); scrollTo(0, y); } };
+}
 function say(text, rate = 0.9) {
   if (!window.speechSynthesis || !S.current || !ST().tts || !text) return;
   speechSynthesis.cancel();
@@ -717,7 +737,9 @@ function exportCSV() {
 function einstellungen() {
   setTitle('Einstellungen');
   const s = ST();
-  const voices = window.speechSynthesis ? speechSynthesis.getVoices().filter(v => (v.lang || '').toLowerCase().startsWith('de')) : [];
+  const voices = germanVoices();
+  const cur = voice ? voice.voiceURI : '';
+  const better = voices.some(v => voiceQuality(v) >= 2);
   const pick = (g, v, label, on) => row({ title: label, detail: on ? `<span style="color:var(--accent)">${ico('check', 20, 2.4)}</span>` : '', attrs: `data-g="${g}" data-v="${esc(v)}"` });
   view.innerHTML = `${navBar('', '', true)}${pageHeader('Einstellungen')}
     ${group('Klassen', STUFEN.map(x => pick('stufen', x, STUFE_NAME[x], s.stufen.includes(x))).join(''), 'Klasse 1/2 und 3/4: Grundwortschatz LehrplanPLUS Bayern. Klasse 5: Erweiterung.')}
@@ -726,9 +748,14 @@ function einstellungen() {
     ${group('Üben',
     row({ icon: iconTile('checklist', 'var(--orange)', 30), title: 'Wörter pro Runde', detail: `<select id="runde">${[5, 10, 15, 20].map(n => `<option ${n === s.runde ? 'selected' : ''}>${n}</option>`).join('')}</select>` }) +
     row({ icon: iconTile('speaker', 'var(--green)', 30), title: 'Vorlesen', detail: toggle('tts', s.tts) }) +
-    row({ icon: iconTile('bubble', 'var(--teal)', 30), title: 'Stimme', detail: `<select id="stimme"><option value="">Automatisch</option>${voices.map(v => `<option ${v.name === s.stimme ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>` }) +
+    row({ icon: iconTile('bubble', 'var(--teal)', 30), title: 'Stimme', sub: voice ? `Jetzt: ${esc(voice.name)} · ${QUAL_LABEL[voiceQuality(voice)]}` : 'Keine deutsche Stimme gefunden',
+      detail: `<select id="stimme"><option value="">Automatisch (beste)</option>${voices.map(v => `<option value="${esc(v.voiceURI)}" ${s.stimme && (v.voiceURI === s.stimme || v.name === s.stimme) ? 'selected' : ''}>${voiceQuality(v) === 3 ? '★ ' : ''}${esc(v.name)} – ${QUAL_LABEL[voiceQuality(v)]}</option>`).join('')}</select>` }) +
     row({ icon: iconTile('sparkles', 'var(--pink)', 30), title: 'Farben für der/die/das', sub: '<span class="c-der">blau</span> · <span class="c-die">rot</span> · <span class="c-das">grün</span>', detail: toggle('farben', s.farben) }) +
-    row({ title: 'Stimme testen', attrs: 'id="test"', cls: 'row-accent' }))}`;
+    row({ title: 'Stimme testen', attrs: 'id="test"', cls: 'row-accent' }))}
+    <div class="tip">${ico('bulb', 24, 2)}<span><b>Mehr Stimmen:</b> Die App nutzt die deutschen Stimmen dieses Geräts (${voices.length} gefunden${better ? '' : ', noch keine in hoher Qualität'}).
+      Weitere Stimmen laden: <b>Einstellungen → Bedienungshilfen → Lesen &amp; Sprechen → Stimmen → Deutsch</b>
+      (bei älteren Systemen „Gesprochene Inhalte“). Am natürlichsten klingt <b>Anna (Premium)</b>, außerdem gibt es z.&nbsp;B. Helena, Petra, Markus und Yannick.
+      Danach die App einmal ganz schließen und neu öffnen. Siri-Stimmen stehen für Web-Apps leider nicht zur Verfügung.</span></div>`;
   $$('[data-g]').forEach(b => b.onclick = () => {
     const g = b.dataset.g, v = b.dataset.v;
     if (g === 'themen' && v === '*') s.themen = [];
@@ -740,7 +767,7 @@ function einstellungen() {
   });
   $$('[data-toggle]').forEach(t => t.onchange = () => { s[t.dataset.toggle] = t.checked; save(); applyColors(); });
   $('#runde').onchange = e => { s.runde = +e.target.value; save(); };
-  $('#stimme').onchange = e => { s.stimme = e.target.value; save(); pickVoice(); say('der Hund, die Katze, das Pferd'); };
+  $('#stimme').onchange = e => { s.stimme = e.target.value; save(); pickVoice(); say('der Hund, die Katze, das Pferd'); const y = scrollY; einstellungen(); scrollTo(0, y); };
   $('#test').onclick = () => say('der Hund, die Katze, das Pferd');
 }
 function applyColors() { document.body.classList.toggle('nocolor', !!S.current && !ST().farben); }
